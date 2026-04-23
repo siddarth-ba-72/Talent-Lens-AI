@@ -6,4 +6,5 @@ import org.springframework.data.domain.Pageable;
 
 public interface SearchRepositoryCustom {
     Page<Search> findWithFilters(String userId, boolean isHiringManager, SearchFilterParams params, Pageable pageable);
+    void addSharedUserAtomically(String searchId, String userId);
 }

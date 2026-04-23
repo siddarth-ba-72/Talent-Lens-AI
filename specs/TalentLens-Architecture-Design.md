@@ -104,6 +104,10 @@ flowchart TD
 | Create Search (submit JD) | ✅ | ❌ |
 | View Own Searches | ✅ | — |
 | View Shared Searches | — | ✅ |
+| View Recruiters | — | ✅ |
+| Request Search Access | — | ✅ |
+| Review Share Requests | ✅ | ❌ |
+| Approve/Reject Share Request | ✅ | ❌ |
 | Trigger Candidate Sourcing | ✅ | ❌ |
 | Re-search Candidates | ✅ | ❌ |
 | View Candidates | ✅ | ✅ |
@@ -207,6 +211,27 @@ flowchart TD
 ```
 
 **Indexes:** `{ searchId: 1 }`, `{ status: 1 }`
+
+### 4.5 `share_requests` Collection
+
+```json
+{
+  "_id": "ObjectId",
+  "searchId": "ObjectId (indexed)",
+  "requesterUserId": "ObjectId (HIRING_MANAGER)",
+  "ownerUserId": "ObjectId (RECRUITER, indexed)",
+  "status": "PENDING | APPROVED | REJECTED",
+  "requestedAt": "ISODate",
+  "resolvedAt": "ISODate | null",
+  "resolvedBy": "ObjectId | null",
+  "note": "string | null"
+}
+```
+
+**Indexes:**
+- `{ ownerUserId: 1, status: 1, requestedAt: -1 }` (incoming request queue for recruiter)
+- `{ requesterUserId: 1, requestedAt: -1 }` (request history for hiring manager)
+- `{ searchId: 1, requesterUserId: 1, status: 1 }` (fast duplicate pending checks)
 
 ---
 
@@ -371,7 +396,61 @@ Response:
   - JSON: Content-Type: application/json, Content-Disposition: attachment
 ```
 
-### 5.4 AI Service Internal Endpoints
+### 5.4 Share Request Endpoints (Authenticated)
+
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| GET | `/api/share-requests/recruiters` | List recruiters for selection | HIRING_MANAGER |
+| POST | `/api/share-requests` | Request access to a recruiter's search | HIRING_MANAGER |
+| GET | `/api/share-requests/incoming` | List pending incoming requests | RECRUITER |
+| GET | `/api/share-requests/outgoing` | List requester history | HIRING_MANAGER |
+| POST | `/api/share-requests/{id}/approve` | Approve and share search | RECRUITER |
+| POST | `/api/share-requests/{id}/reject` | Reject request | RECRUITER |
+
+**POST `/api/share-requests`** — Create Request
+
+```json
+Request Body:
+{
+  "searchId": "string",
+  "recruiterUserId": "string",
+  "note": "Can I review this role?"
+}
+
+Response: 201 Created
+{
+  "id": "string",
+  "searchId": "string",
+  "requesterUserId": "string",
+  "ownerUserId": "string",
+  "status": "PENDING",
+  "requestedAt": "ISO timestamp"
+}
+```
+
+Validation rules:
+- `recruiterUserId` must match the owner of `searchId`
+- requester role must be `HIRING_MANAGER`
+- duplicate pending request for the same (`searchId`, `requesterUserId`) is rejected with 409
+
+**POST `/api/share-requests/{id}/approve`** — Approve Request
+
+```json
+Response: 200 OK
+{
+  "id": "string",
+  "status": "APPROVED",
+  "resolvedAt": "ISO timestamp"
+}
+```
+
+Approve flow:
+1. Ensure request belongs to authenticated recruiter (`ownerUserId`)
+2. Update request status to `APPROVED`
+3. Add `requesterUserId` to `search.sharedWith` (idempotent add)
+4. Persist both updates
+
+### 5.5 AI Service Internal Endpoints
 
 These endpoints are called by the Spring Boot backend only (not exposed to frontend).
 
@@ -658,6 +737,11 @@ flowchart LR
 - `DELETE /api/searches/{id}` → RECRUITER only
 - `POST /api/searches/{id}/source` → RECRUITER only
 - `DELETE /api/searches/{id}/candidates/{cid}` → RECRUITER only
+- `GET /api/share-requests/recruiters` → HIRING_MANAGER only
+- `POST /api/share-requests` → HIRING_MANAGER only
+- `GET /api/share-requests/incoming` → RECRUITER only
+- `POST /api/share-requests/{id}/approve` → RECRUITER only
+- `POST /api/share-requests/{id}/reject` → RECRUITER only
 
 **All Other Endpoints:** Authenticated (any role)
 

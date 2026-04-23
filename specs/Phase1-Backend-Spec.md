@@ -7,6 +7,7 @@
 Phase 1 delivers the complete Spring Boot backend service. At the end of this phase, the backend must be:
 
 - Fully functional for auth, search CRUD, candidate management, and export
+- Fully functional for search sharing workflow: hiring manager request, recruiter approve/reject, and persisted request history
 - Publishing to the `sourcing-requests` Kafka topic and consuming from `sourcing-results` (AI service is not live yet — integration is wired and testable with a local Kafka and a manual test consumer)
 - Calling the AI service synchronously for JD parsing and file forwarding (tested against a WireMock stub; will connect to the live Phase 2 AI service with zero backend changes)
 - Running locally via `docker-compose` with MongoDB and Kafka
@@ -94,12 +95,14 @@ com.talentlens/
 ├── controller/
 │   ├── AuthController.java
 │   ├── SearchController.java
-│   └── CandidateController.java
+│   ├── CandidateController.java
+│   └── ShareRequestController.java
 
 ├── service/
 │   ├── AuthService.java                  (interface)
 │   ├── SearchService.java                (interface)
 │   ├── CandidateService.java             (interface)
+│   ├── ShareRequestService.java          (interface)
 │   ├── SourcingService.java              (interface)
 │   ├── AiServiceClient.java              (interface)
 │   ├── ExportService.java                (interface)
@@ -107,6 +110,7 @@ com.talentlens/
 │       ├── AuthServiceImpl.java
 │       ├── SearchServiceImpl.java
 │       ├── CandidateServiceImpl.java
+│       ├── ShareRequestServiceImpl.java
 │       ├── SourcingServiceImpl.java
 │       ├── AiServiceClientImpl.java
 │       ├── CsvExportService.java
@@ -120,13 +124,15 @@ com.talentlens/
 │   ├── CandidateRepository.java
 │   ├── CandidateRepositoryCustom.java    (interface)
 │   ├── CandidateRepositoryCustomImpl.java
-│   └── SourcingTaskRepository.java
+│   ├── SourcingTaskRepository.java
+│   └── ShareRequestRepository.java
 
 ├── model/
 │   ├── User.java
 │   ├── Search.java
 │   ├── Candidate.java
 │   ├── SourcingTask.java
+│   ├── ShareRequest.java
 │   └── embedded/
 │       ├── ParsedJd.java
 │       └── ScoreBreakdown.java
@@ -144,11 +150,13 @@ com.talentlens/
 │       ├── SearchSummaryResponse.java
 │       ├── CandidateResponse.java
 │       ├── SourcingStatusResponse.java
+│       ├── ShareRequestResponse.java
 │       └── PageResponse.java
 
 ├── mapper/
 │   ├── SearchMapper.java
-│   └── CandidateMapper.java
+│   ├── CandidateMapper.java
+│   └── ShareRequestMapper.java
 
 ├── security/
 │   ├── JwtTokenProvider.java
@@ -259,6 +267,15 @@ Fields: `id`, `searchId` (indexed), `runId` (matches the `runId` on all candidat
 
 Indexes: `{ searchId: 1 }`, `{ status: 1 }`.
 
+### 7.7 ShareRequest
+
+Fields: `id`, `searchId` (indexed), `requesterUserId` (indexed), `ownerUserId` (indexed), `status` (enum: `PENDING` | `APPROVED` | `REJECTED`), `requestedAt`, `resolvedAt` (nullable), `resolvedBy` (nullable), `note` (nullable).
+
+Indexes:
+- `{ ownerUserId: 1, status: 1, requestedAt: -1 }`
+- `{ requesterUserId: 1, requestedAt: -1 }`
+- `{ searchId: 1, requesterUserId: 1, status: 1 }`
+
 ---
 
 ## 8. Re-Search and Run-ID Design
@@ -308,6 +325,12 @@ Session management is stateless (no server-side session). CSRF protection is dis
 | `DELETE /api/searches/**` | RECRUITER role only |
 | `POST /api/searches/*/source` | RECRUITER role only |
 | `DELETE /api/searches/*/candidates/**` | RECRUITER role only |
+| `GET /api/share-requests/recruiters` | HIRING_MANAGER role only |
+| `POST /api/share-requests` | HIRING_MANAGER role only |
+| `GET /api/share-requests/outgoing` | HIRING_MANAGER role only |
+| `GET /api/share-requests/incoming` | RECRUITER role only |
+| `POST /api/share-requests/*/approve` | RECRUITER role only |
+| `POST /api/share-requests/*/reject` | RECRUITER role only |
 | All other `/api/**` | Any authenticated user |
 
 ### 9.3 JWT Token Design
@@ -377,6 +400,17 @@ The authenticated user ID is extracted via a shared utility method that reads fr
 
 The export endpoint sets `Content-Disposition: attachment` and streams directly to `HttpServletResponse.getOutputStream()`. It does not return a body via the normal Spring MVC return value mechanism.
 
+### 10.4 ShareRequestController — `/api/share-requests`
+
+| Method | Path | Delegates To | Response Code |
+|---|---|---|---|
+| GET | `/recruiters` | `ShareRequestService.listRecruiters` | 200 |
+| POST | `/` | `ShareRequestService.createRequest` | 201 |
+| GET | `/incoming` | `ShareRequestService.listIncoming` | 200 |
+| GET | `/outgoing` | `ShareRequestService.listOutgoing` | 200 |
+| POST | `/{id}/approve` | `ShareRequestService.approve` | 200 |
+| POST | `/{id}/reject` | `ShareRequestService.reject` | 200 |
+
 ---
 
 ## 11. Service Layer
@@ -435,6 +469,30 @@ An `ExportServiceFactory` is injected with all `ExportService` implementations a
 
 Both implementations: retrieve the full (un-paginated) candidate list via `CandidateRepositoryCustom.findAllWithFilters` (same filter logic as listing, `isActive = true` always), then stream the output field-by-field to `HttpServletResponse.getOutputStream()`. Headers (`Content-Type`, `Content-Disposition`, `filename`) are set before writing begins.
 
+### 11.6 ShareRequestService
+
+**createRequest flow (HIRING_MANAGER):**
+1. Validate target search exists.
+2. Validate requester is not the owner.
+3. Validate owner role is `RECRUITER`.
+4. Validate no existing pending request for `(searchId, requesterUserId)`.
+5. Persist `ShareRequest` with `status = PENDING`.
+6. Return `ShareRequestResponse`.
+
+**approve flow (RECRUITER):**
+1. Load request by ID and assert `ownerUserId` equals authenticated recruiter ID.
+2. Ensure status is `PENDING`.
+3. Update request to `APPROVED`, set `resolvedAt`, `resolvedBy`.
+4. Add `requesterUserId` to `search.sharedWith` idempotently (no duplicates).
+5. Persist request and search.
+
+**reject flow (RECRUITER):**
+1. Same ownership and state checks as approve.
+2. Update request to `REJECTED`, set `resolvedAt`, `resolvedBy`.
+3. Persist request only.
+
+**listIncoming/listOutgoing:** paginated lists by owner/requester with optional status filter.
+
 ---
 
 ## 12. Repository Layer
@@ -458,6 +516,14 @@ The custom fragment provides two variants of the filter query: a paginated one (
 ### 12.4 SourcingTaskRepository
 
 Key methods: find the most recent task for a given `searchId` (ordered by `startedAt` descending, limit 1), delete all tasks by `searchId`.
+
+### 12.5 ShareRequestRepository
+
+Key methods:
+- Find pending requests by owner with pagination
+- Find requests by requester with pagination
+- Find by id and ownerUserId (ownership-scoped approval/rejection)
+- Exists pending by searchId + requesterUserId (duplicate request guard)
 
 ---
 
@@ -559,7 +625,7 @@ Response DTOs use Java 17 records (immutable, compact constructor, auto-generate
 
 ### 15.3 DTO Mapping with MapStruct
 
-`SearchMapper` and `CandidateMapper` are MapStruct `@Mapper` interfaces with `componentModel = "spring"`. They are injected as Spring beans into service implementations. MapStruct generates the implementation at compile time — no reflection at runtime, and any field mismatch is a compile error, not a silent null.
+`SearchMapper`, `CandidateMapper`, and `ShareRequestMapper` are MapStruct `@Mapper` interfaces with `componentModel = "spring"`. They are injected as Spring beans into service implementations. MapStruct generates the implementation at compile time — no reflection at runtime, and any field mismatch is a compile error, not a silent null.
 
 ---
 
@@ -575,6 +641,9 @@ Index summary:
 | `searches` | `{ userId: 1 }` | Standard |
 | `searches` | `{ userId: 1, createdAt: -1 }` | Compound |
 | `searches` | `{ sharedWith: 1 }` | Standard (multikey) |
+| `share_requests` | `{ ownerUserId: 1, status: 1, requestedAt: -1 }` | Compound |
+| `share_requests` | `{ requesterUserId: 1, requestedAt: -1 }` | Compound |
+| `share_requests` | `{ searchId: 1, requesterUserId: 1, status: 1 }` | Compound |
 | `candidates` | `{ searchId: 1, runId: 1, source: 1, sourceUsername: 1 }` | Unique compound |
 | `candidates` | `{ searchId: 1, isActive: 1, matchScore: -1 }` | Compound |
 | `sourcing_tasks` | `{ searchId: 1 }` | Standard |
@@ -622,6 +691,7 @@ Each test class covers:
 - Validation errors (missing fields, wrong format → 400)
 - Not-found cases → 404
 - AI service failure → 503
+- Sharing flow coverage: create request (201), recruiter incoming list (200), approve/reject (200), duplicate pending request (409), unauthorized approve/reject (403)
 
 ### 19.3 Kafka Tests
 
@@ -650,16 +720,18 @@ Example: `given_hiringManagerJwt_when_deleteSearch_then_returns403`
 | `pom.xml` | All dependencies, Java 17 compiler config, Maven wrapper |
 | `application.yml` | Full config for local and prod profiles |
 | `docker-compose.yml` | MongoDB + Kafka + backend service |
-| Domain models | User, Search, Candidate, SourcingTask, ParsedJd, ScoreBreakdown |
+| Domain models | User, Search, Candidate, SourcingTask, ShareRequest, ParsedJd, ScoreBreakdown |
 | Security | JwtTokenProvider, JwtAuthenticationFilter, SecurityConfig, UserDetailsServiceImpl, RateLimitFilter |
 | Auth endpoints | Register, login, refresh, me — BCrypt, JWT, validation |
 | Search endpoints | Create (file forwarding to AI + text path), list (filtered/paged), get, delete (cascade) |
+| Share request endpoints | Request access, list incoming/outgoing, approve, reject |
 | Sourcing endpoints | Trigger (run-id generation, Kafka produce), poll status |
 | Candidate endpoints | List (filtered/paged by run or all runs), soft delete, export (CSV + JSON streaming) |
 | Kafka | SourcingRequestProducer, SourcingResultConsumer, topic beans, message DTOs |
 | AI client | AiServiceClientImpl (WebClient, two methods), StubAiServiceClient (dev-stub profile) |
 | Exception handling | GlobalExceptionHandler covering all defined error codes and Spring built-ins |
 | MongoDB indexes | All indexes applied on startup via MongoConfig |
-| MapStruct mappers | SearchMapper, CandidateMapper |
+| Share request data layer | ShareRequest model + repository + indexes + service |
+| MapStruct mappers | SearchMapper, CandidateMapper, ShareRequestMapper |
 | Unit tests | Service layer — 80%+ line coverage |
 | Integration tests | All controller endpoints + Kafka consumer, using Testcontainers + WireMock + EmbeddedKafka |

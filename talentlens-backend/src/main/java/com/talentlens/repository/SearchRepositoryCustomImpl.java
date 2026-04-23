@@ -1,15 +1,16 @@
 package com.talentlens.repository;
 
 import com.talentlens.model.Search;
-import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -59,5 +60,14 @@ public class SearchRepositoryCustomImpl implements SearchRepositoryCustom {
         long total = mongoTemplate.count(countQuery, Search.class);
 
         return new PageImpl<>(results, pageable, total);
+    }
+
+    @Override
+    public void addSharedUserAtomically(String searchId, String userId) {
+        Query query = new Query(Criteria.where("_id").is(searchId));
+        Update update = new Update()
+                .addToSet("sharedWith", userId)
+                .set("updatedAt", Instant.now());
+        mongoTemplate.updateFirst(query, update, Search.class);
     }
 }

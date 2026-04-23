@@ -2,6 +2,7 @@ package com.talentlens.config;
 
 import com.talentlens.model.Candidate;
 import com.talentlens.model.Search;
+import com.talentlens.model.ShareRequest;
 import com.talentlens.model.SourcingTask;
 import com.talentlens.model.User;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,13 @@ public class MongoConfig {
 
         idx(SourcingTask.class).createIndex(new Index("searchId", Sort.Direction.ASC));
         idx(SourcingTask.class).createIndex(new Index("status", Sort.Direction.ASC));
+
+        idx(ShareRequest.class).createIndex(new CompoundIndexDefinition(
+            new Document("ownerUserId", 1).append("status", 1).append("requestedAt", -1)));
+        idx(ShareRequest.class).createIndex(new CompoundIndexDefinition(
+            new Document("requesterUserId", 1).append("requestedAt", -1)));
+        idx(ShareRequest.class).createIndex(new CompoundIndexDefinition(
+            new Document("searchId", 1).append("requesterUserId", 1).append("status", 1)));
 
         log.info("MongoDB indexes created");
     }

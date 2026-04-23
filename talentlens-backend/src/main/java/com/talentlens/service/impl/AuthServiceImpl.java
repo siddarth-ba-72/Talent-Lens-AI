@@ -8,6 +8,7 @@ import com.talentlens.dto.response.UserResponse;
 import com.talentlens.exception.DuplicateResourceException;
 import com.talentlens.exception.ResourceNotFoundException;
 import com.talentlens.exception.UnauthorizedException;
+import com.talentlens.mapper.UserMapper;
 import com.talentlens.model.User;
 import com.talentlens.repository.UserRepository;
 import com.talentlens.security.JwtTokenProvider;
@@ -25,6 +26,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserMapper userMapper;
 
     @Override
     public UserResponse register(RegisterRequest request) {
@@ -36,13 +38,13 @@ public class AuthServiceImpl implements AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
-                .role(request.getRole())
+                .role(request.resolveRole())
                 .createdAt(Instant.now())
                 .updatedAt(Instant.now())
                 .build();
 
         User saved = userRepository.save(user);
-        return toUserResponse(saved);
+        return userMapper.toResponse(saved);
     }
 
     @Override
@@ -57,7 +59,7 @@ public class AuthServiceImpl implements AuthService {
         return new AuthResponse(
                 jwtTokenProvider.generateAccessToken(user),
                 jwtTokenProvider.generateRefreshToken(user.getId()),
-                toUserResponse(user)
+            userMapper.toResponse(user)
         );
     }
 
@@ -72,7 +74,7 @@ public class AuthServiceImpl implements AuthService {
         return new AuthResponse(
                 jwtTokenProvider.generateAccessToken(user),
                 jwtTokenProvider.generateRefreshToken(user.getId()),
-                toUserResponse(user)
+            userMapper.toResponse(user)
         );
     }
 
@@ -80,10 +82,6 @@ public class AuthServiceImpl implements AuthService {
     public UserResponse getProfile(String userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        return toUserResponse(user);
-    }
-
-    private UserResponse toUserResponse(User user) {
-        return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getRole().name());
+        return userMapper.toResponse(user);
     }
 }
