@@ -19,7 +19,7 @@ export function ExportButton({ searchId }: ExportButtonProps) {
           variant="outline"
           size="sm"
           className="rounded-none border-0 border-r gap-1.5 px-3"
-          onClick={exportCsv}
+          onClick={() => exportCsv()}
           disabled={isExporting}
         >
           {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
