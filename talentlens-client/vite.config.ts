@@ -19,5 +19,14 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'zustand', 'axios'],
+          },
+        },
+      },
+    },
   }
 })
