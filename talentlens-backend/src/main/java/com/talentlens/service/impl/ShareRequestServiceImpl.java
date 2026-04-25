@@ -3,7 +3,9 @@ package com.talentlens.service.impl;
 import com.talentlens.dto.request.CreateShareRequestRequest;
 import com.talentlens.dto.response.PageResponse;
 import com.talentlens.dto.response.RecruiterResponse;
+import com.talentlens.dto.response.SearchSummaryResponse;
 import com.talentlens.dto.response.ShareRequestResponse;
+import com.talentlens.mapper.SearchMapper;
 import com.talentlens.mapper.ShareRequestMapper;
 import com.talentlens.mapper.UserMapper;
 import com.talentlens.model.Role;
@@ -30,6 +32,7 @@ public class ShareRequestServiceImpl implements ShareRequestService {
     private final UserRepository userRepository;
     private final SearchRepository searchRepository;
     private final ShareRequestRepository shareRequestRepository;
+    private final SearchMapper searchMapper;
     private final ShareRequestMapper shareRequestMapper;
     private final UserMapper userMapper;
     private final ShareRequestPolicy shareRequestPolicy;
@@ -38,6 +41,12 @@ public class ShareRequestServiceImpl implements ShareRequestService {
     public PageResponse<RecruiterResponse> listRecruiters(Pageable pageable) {
         Page<User> page = userRepository.findByRole(Role.RECRUITER, pageable);
         return PageResponse.from(page.map(userMapper::toRecruiterResponse));
+    }
+
+    @Override
+    public PageResponse<SearchSummaryResponse> listRecruiterSearches(String recruiterId, Pageable pageable) {
+        Page<Search> page = searchRepository.findByUserId(recruiterId, pageable);
+        return PageResponse.from(page.map(searchMapper::toSummary));
     }
 
     @Override

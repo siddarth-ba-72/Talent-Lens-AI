@@ -3,6 +3,7 @@ package com.talentlens.controller;
 import com.talentlens.dto.request.CreateShareRequestRequest;
 import com.talentlens.dto.response.PageResponse;
 import com.talentlens.dto.response.RecruiterResponse;
+import com.talentlens.dto.response.SearchSummaryResponse;
 import com.talentlens.dto.response.ShareRequestResponse;
 import com.talentlens.service.ShareRequestService;
 import jakarta.validation.Valid;
@@ -33,6 +34,15 @@ public class ShareRequestController {
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(shareRequestService.listRecruiters(pageable));
+    }
+
+    @GetMapping("/recruiters/{recruiterId}/searches")
+    public ResponseEntity<PageResponse<SearchSummaryResponse>> listRecruiterSearches(
+            @PathVariable String recruiterId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return ResponseEntity.ok(shareRequestService.listRecruiterSearches(recruiterId, pageable));
     }
 
     @PostMapping
