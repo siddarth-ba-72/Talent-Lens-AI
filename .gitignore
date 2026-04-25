@@ -3,6 +3,10 @@
 
 .vscode/
 
+# Internal specs and requirements (not for public repo)
+requirements/
+specs/
+
 ### Angular ###
 ## Angular ##
 # compiled output
@@ -230,5 +234,8 @@ poetry.toml
 
 # LSP config files
 pyrightconfig.json
+
+requirements
+specs
 
 # End of https://www.toptal.com/developers/gitignore/api/java,python,angular
