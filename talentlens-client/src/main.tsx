@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+console.log('[TalentLens] main.tsx executing')
+
 const rootEl = document.getElementById('root')!
 
 try {
