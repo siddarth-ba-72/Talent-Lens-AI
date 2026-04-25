@@ -25,9 +25,12 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -58,7 +61,7 @@ public class SearchServiceImpl implements SearchService {
             throw new InvalidFileException("Either jdText or jdFile must be provided");
         }
 
-        String title = deriveTitle(parsedJd.getSummary());
+        String title = deriveTitle(parsedJd);
 
         Search search = Search.builder()
                 .userId(userId)
@@ -128,11 +131,18 @@ public class SearchServiceImpl implements SearchService {
         }
     }
 
-    private String deriveTitle(String summary) {
-        if (!StringUtils.hasText(summary)) return "Untitled Search";
-        if (summary.length() <= 100) return summary;
+    private static final DateTimeFormatter TITLE_TIMESTAMP_FMT =
+            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss").withZone(ZoneOffset.UTC);
 
-        int boundary = summary.lastIndexOf(' ', 100);
-        return (boundary > 0 ? summary.substring(0, boundary) : summary.substring(0, 100)) + "...";
+    private String deriveTitle(ParsedJd parsedJd) {
+        // Build a short slug from domain + experience level (fall back to "Search" if missing)
+        String base = Stream.of(parsedJd.getDomain(), parsedJd.getExperienceLevel())
+                .filter(StringUtils::hasText)
+                .map(s -> s.trim().replaceAll("[^a-zA-Z0-9]+", "-"))
+                .collect(java.util.stream.Collectors.joining("-"));
+        if (!StringUtils.hasText(base)) base = "Search";
+
+        String timestamp = TITLE_TIMESTAMP_FMT.format(Instant.now());
+        return base + "_" + timestamp;
     }
 }
