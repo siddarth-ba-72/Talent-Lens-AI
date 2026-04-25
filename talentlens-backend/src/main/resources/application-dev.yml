@@ -1,13 +1,13 @@
 spring:
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb://root:root@localhost:27017/talentlens?authSource=admin}
-      database: ${MONGODB_DATABASE:talentlens}
+      uri: ${MONGODB_URI:mongodb}
+      database: ${MONGODB_DATABASE}
       auto-index-creation: false
 
 app:
   ai-service:
-    url: ${AI_SERVICE_URL:http://localhost:9000}
+    url: ${AI_SERVICE_URL}
     timeout-seconds: 30
     sourcing-timeout-seconds: 120
   cors:
