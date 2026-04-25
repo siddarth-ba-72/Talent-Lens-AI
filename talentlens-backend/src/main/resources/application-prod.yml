@@ -1,13 +1,13 @@
 spring:
   data:
     mongodb:
-      uri: ${MONGODB_URI:mongodb+srv://talent-lens-admin:talent-lens-admin@talent-lens-db-cluster.lc9vrlh.mongodb.net/?appName=talent-lens-db-cluster}
-      database: ${MONGODB_DATABASE:talent-lens-db-cluster}
+      uri: ${MONGODB_URI}
+      database: ${MONGODB_DATABASE}
       auto-index-creation: false
 
 app:
   ai-service:
-    url: ${AI_SERVICE_URL:https://talentlens-ai-topaz.vercel.app}
+    url: ${AI_SERVICE_URL}
     timeout-seconds: 30
     sourcing-timeout-seconds: 120
   cors:
