@@ -4,20 +4,4 @@ spring:
       uri: ${MONGODB_URI:mongodb://root:root@localhost:27017/talentlens?authSource=admin}
       database: ${MONGODB_DATABASE:talentlens}
       auto-index-creation: false
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-      properties:
-        spring.json.add.type.headers: false
-    consumer:
-      group-id: ${KAFKA_CONSUMER_GROUP_ID:talentlens-backend-dev}
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "com.talentlens.kafka.dto"
-    listener:
-      missing-topics-fatal: false
 

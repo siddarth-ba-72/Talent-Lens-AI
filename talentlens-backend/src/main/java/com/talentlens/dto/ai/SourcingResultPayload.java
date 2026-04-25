@@ -1,8 +1,6 @@
-package com.talentlens.kafka.dto;
+package com.talentlens.dto.ai;
 
-import com.talentlens.model.embedded.ParsedJd;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -10,14 +8,15 @@ import java.time.Instant;
 import java.util.List;
 
 @Data
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class SourcingRequestMessage {
+public class SourcingResultPayload {
     private String taskId;
     private String searchId;
     private String runId;
-    private ParsedJd parsedJd;
-    private List<String> platforms;
-    private Instant timestamp;
+    private String status;
+    private int candidatesFound;
+    private List<SourcedCandidatePayload> candidates;
+    private String error;
+    private Instant completedAt;
 }

@@ -4,27 +4,5 @@ spring:
 	  uri: ${MONGODB_URI}
 	  database: ${MONGODB_DATABASE}
 	  auto-index-creation: false
-  kafka:
-	bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
-	producer:
-	  key-serializer: org.apache.kafka.common.serialization.StringSerializer
-	  value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
-	  properties:
-		spring.json.add.type.headers: false
-	consumer:
-	  group-id: ${KAFKA_CONSUMER_GROUP_ID:talentlens-backend}
-	  auto-offset-reset: earliest
-	  key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-	  value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-	  properties:
-		spring.json.trusted.packages: "com.talentlens.kafka.dto"
-	listener:
-	  missing-topics-fatal: false
-	properties:
-	  security.protocol: ${KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
-	  sasl.mechanism: ${KAFKA_SASL_MECHANISM:}
-	  sasl.jaas.config: >
-		org.apache.kafka.common.security.plain.PlainLoginModule required
-		username="${KAFKA_SASL_USERNAME}"
-		password="${KAFKA_SASL_PASSWORD}";
+
 

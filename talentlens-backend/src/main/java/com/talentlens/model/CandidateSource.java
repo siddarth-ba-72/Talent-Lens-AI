@@ -2,5 +2,8 @@ package com.talentlens.model;
 
 public enum CandidateSource {
     GITHUB,
-    STACKOVERFLOW
+    STACKOVERFLOW,
+    LEETCODE,
+    PEOPLES_DATA,
+    OTHER
 }

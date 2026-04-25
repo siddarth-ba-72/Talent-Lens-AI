@@ -1,5 +1,6 @@
 package com.talentlens.controller;
 
+import com.talentlens.dto.request.CreateSearchRequest;
 import com.talentlens.dto.request.SourcingRequest;
 import com.talentlens.dto.response.PageResponse;
 import com.talentlens.dto.response.SearchResponse;
@@ -40,13 +41,20 @@ public class SearchController {
     private final SearchService searchService;
     private final SourcingService sourcingService;
 
-    @PostMapping(consumes = {"multipart/form-data"})
-    public ResponseEntity<SearchResponse> createSearch(
+    @PostMapping(path = "/jd-file", consumes = {"multipart/form-data"})
+    public ResponseEntity<SearchResponse> createSearchFromFile(
             @AuthenticationPrincipal String userId,
-            @RequestParam(required = false) MultipartFile jdFile,
-            @RequestParam(required = false) String jdText) {
+            @RequestParam MultipartFile jdFile) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(searchService.createSearch(userId, jdFile, jdText));
+                .body(searchService.createSearch(userId, jdFile, null));
+    }
+
+    @PostMapping(path = "/jd-text", consumes = {"application/json"})
+    public ResponseEntity<SearchResponse> createSearchFromText(
+            @AuthenticationPrincipal String userId,
+            @RequestBody CreateSearchRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(searchService.createSearch(userId, null, request.getJdText()));
     }
 
     @GetMapping

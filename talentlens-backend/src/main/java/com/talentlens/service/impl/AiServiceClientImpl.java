@@ -1,5 +1,7 @@
 package com.talentlens.service.impl;
 
+import com.talentlens.dto.ai.SourcingRequestPayload;
+import com.talentlens.dto.ai.SourcingResultPayload;
 import com.talentlens.exception.AiServiceException;
 import com.talentlens.model.embedded.ParsedJd;
 import com.talentlens.service.AiServiceClient;
@@ -30,6 +32,9 @@ public class AiServiceClientImpl implements AiServiceClient {
 
     @Value("${app.ai-service.timeout-seconds}")
     private long timeoutSeconds;
+
+    @Value("${app.ai-service.sourcing-timeout-seconds}")
+    private long sourcingTimeoutSeconds;
 
     @Override
     public ParsedJd parseJd(String jdText) {
@@ -90,5 +95,27 @@ public class AiServiceClientImpl implements AiServiceClient {
         } catch (IOException ex) {
             throw new AiServiceException("Failed to read uploaded file", ex);
         }
+    }
+
+    @Override
+    public SourcingResultPayload sourceCandidates(SourcingRequestPayload payload) {
+        log.info("Calling AI service to source candidates: searchId={}, taskId={}",
+                payload.getSearchId(), payload.getTaskId());
+        return aiWebClient.post()
+                .uri("/ai/source-candidates")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(payload)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, response ->
+                        response.bodyToMono(String.class)
+                                .map(body -> new AiServiceException("AI service returned error: " + body))
+                )
+                .bodyToMono(SourcingResultPayload.class)
+                .timeout(Duration.ofSeconds(sourcingTimeoutSeconds))
+                .doOnError(ex -> !(ex instanceof AiServiceException),
+                        ex -> log.error("AI sourcing call failed for searchId={}", payload.getSearchId(), ex))
+                .onErrorMap(ex -> !(ex instanceof AiServiceException),
+                        ex -> new AiServiceException("AI service is unavailable", ex))
+                .block();
     }
 }

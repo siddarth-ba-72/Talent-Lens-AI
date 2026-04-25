@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface CandidateRepository extends MongoRepository<Candidate, String>, CandidateRepositoryCustom {
     Optional<Candidate> findByIdAndSearchId(String id, String searchId);
+    long countBySearchIdAndIsActiveTrue(String searchId);
     void deleteBySearchId(String searchId);
 }

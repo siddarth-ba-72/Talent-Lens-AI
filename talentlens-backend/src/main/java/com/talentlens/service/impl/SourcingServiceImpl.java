@@ -1,19 +1,18 @@
 package com.talentlens.service.impl;
 
+import com.talentlens.dto.ai.SourcingRequestPayload;
 import com.talentlens.dto.request.SourcingRequest;
 import com.talentlens.dto.response.SourcingStatusResponse;
 import com.talentlens.exception.ForbiddenException;
 import com.talentlens.exception.InvalidFileException;
 import com.talentlens.exception.ResourceNotFoundException;
-import com.talentlens.kafka.SourcingRequestProducer;
-import com.talentlens.kafka.dto.SourcingRequestMessage;
-import com.talentlens.kafka.dto.SourcingResultMessage;
 import com.talentlens.model.Search;
 import com.talentlens.model.SourcingStatus;
 import com.talentlens.model.SourcingTask;
 import com.talentlens.model.TaskStatus;
 import com.talentlens.repository.SearchRepository;
 import com.talentlens.repository.SourcingTaskRepository;
+import com.talentlens.service.AsyncSourcingExecutor;
 import com.talentlens.service.SourcingService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Set;
 
 @Service
@@ -30,13 +28,14 @@ import java.util.Set;
 @Slf4j
 public class SourcingServiceImpl implements SourcingService {
 
-    private static final Set<String> ALLOWED_PLATFORMS = Set.of("GITHUB", "STACKOVERFLOW");
+    private static final Set<String> ALLOWED_PLATFORMS = Set.of("GITHUB", "STACKOVERFLOW", "LEETCODE", "PEOPLES_DATA");
+    private static final String ALLOWED_PLATFORMS_TEXT = "GITHUB, STACKOVERFLOW, LEETCODE, PEOPLES_DATA";
     private static final DateTimeFormatter RUN_ID_FORMATTER =
-            DateTimeFormatter.ofPattern("'run_'yyyy-MM-dd'_'HHmmss").withZone(ZoneOffset.UTC);
+        DateTimeFormatter.ofPattern("'run_'yyyyMMdd'_'HHmmss'_'SSS").withZone(ZoneOffset.UTC);
 
     private final SearchRepository searchRepository;
     private final SourcingTaskRepository sourcingTaskRepository;
-    private final SourcingRequestProducer sourcingRequestProducer;
+    private final AsyncSourcingExecutor asyncSourcingExecutor;
 
     @Override
     public SourcingStatusResponse triggerSourcing(String userId, String searchId, SourcingRequest request) {
@@ -71,7 +70,7 @@ public class SourcingServiceImpl implements SourcingService {
         search.setUpdatedAt(Instant.now());
         searchRepository.save(search);
 
-        SourcingRequestMessage message = SourcingRequestMessage.builder()
+        SourcingRequestPayload payload = SourcingRequestPayload.builder()
                 .taskId(savedTask.getId())
                 .searchId(searchId)
                 .runId(runId)
@@ -80,7 +79,7 @@ public class SourcingServiceImpl implements SourcingService {
                 .timestamp(Instant.now())
                 .build();
 
-        sourcingRequestProducer.send(message);
+        asyncSourcingExecutor.execute(payload);
 
         return toStatusResponse(savedTask, searchId);
     }
@@ -96,40 +95,10 @@ public class SourcingServiceImpl implements SourcingService {
         return toStatusResponse(task, searchId);
     }
 
-    @Override
-    public void processSourcingResult(SourcingResultMessage message) {
-        SourcingTask task = sourcingTaskRepository.findById(message.getTaskId())
-                .orElseThrow(() -> new ResourceNotFoundException("SourcingTask not found: " + message.getTaskId()));
-
-        TaskStatus newTaskStatus = "COMPLETED".equals(message.getStatus()) ? TaskStatus.COMPLETED : TaskStatus.FAILED;
-        task.setStatus(newTaskStatus);
-        task.setCandidatesFound(message.getCandidatesFound());
-        task.setError(message.getError());
-        task.setCompletedAt(message.getCompletedAt());
-        sourcingTaskRepository.save(task);
-
-        Search search = searchRepository.findById(message.getSearchId())
-                .orElseThrow(() -> new ResourceNotFoundException("Search not found: " + message.getSearchId()));
-
-        SourcingStatus newSourcingStatus = newTaskStatus == TaskStatus.COMPLETED
-                ? SourcingStatus.COMPLETED
-                : SourcingStatus.FAILED;
-
-        search.setSourcingStatus(newSourcingStatus);
-        if (newTaskStatus == TaskStatus.COMPLETED) {
-            search.setCandidateCount(search.getCandidateCount() + message.getCandidatesFound());
-        }
-        search.setUpdatedAt(Instant.now());
-        searchRepository.save(search);
-
-        log.info("Processed sourcing result: searchId={}, runId={}, status={}, candidatesFound={}",
-                message.getSearchId(), message.getRunId(), message.getStatus(), message.getCandidatesFound());
-    }
-
-    private void validatePlatforms(List<String> platforms) {
+    private void validatePlatforms(java.util.List<String> platforms) {
         platforms.forEach(p -> {
             if (!ALLOWED_PLATFORMS.contains(p)) {
-                throw new InvalidFileException("Invalid platform: " + p + ". Allowed: GITHUB, STACKOVERFLOW");
+                throw new InvalidFileException("Invalid platform: " + p + ". Allowed: " + ALLOWED_PLATFORMS_TEXT);
             }
         });
     }
