@@ -22,8 +22,12 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'zustand', 'axios'],
+          manualChunks(id) {
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-dom') ||
+                id.includes('node_modules/react-router-dom') || id.includes('node_modules/@tanstack') ||
+                id.includes('node_modules/zustand') || id.includes('node_modules/axios')) {
+              return 'vendor'
+            }
           },
         },
       },
