@@ -54,6 +54,15 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.SERVICE_UNAVAILABLE, "AI_SERVICE_UNAVAILABLE", ex.getMessage(), req);
     }
 
+    @ExceptionHandler(OidcException.class)
+    public ResponseEntity<ErrorResponse> handleOidc(OidcException ex, HttpServletRequest req) {
+        log.warn("OIDC error [{}]: {}", ex.getCode(), ex.getMessage());
+        HttpStatus status = "signup_expired".equals(ex.getCode())
+                ? HttpStatus.UNAUTHORIZED
+                : HttpStatus.BAD_REQUEST;
+        return build(status, ex.getCode().toUpperCase(), ex.getMessage(), req);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex, HttpServletRequest req) {
         String message = ex.getBindingResult().getFieldErrors().stream()

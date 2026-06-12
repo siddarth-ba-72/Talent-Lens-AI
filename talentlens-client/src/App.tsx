@@ -13,6 +13,7 @@ import { useUiStore } from '@/stores/uiStore'
 
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
+const OAuthCallbackPage = lazy(() => import('@/pages/OAuthCallbackPage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const NewSearchPage = lazy(() => import('@/pages/NewSearchPage'))
 const SearchDetailPage = lazy(() => import('@/pages/SearchDetailPage'))
@@ -60,6 +61,7 @@ function AppRoutes() {
         <Route element={<PublicRoute />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/oauth/google/callback" element={<OAuthCallbackPage />} />
         </Route>
 
         <Route element={<ProtectedRoute />}>

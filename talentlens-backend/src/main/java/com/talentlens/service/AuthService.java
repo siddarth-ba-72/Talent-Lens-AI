@@ -1,9 +1,12 @@
 package com.talentlens.service;
 
+import com.talentlens.dto.request.GoogleCallbackRequest;
+import com.talentlens.dto.request.GoogleCompleteSignupRequest;
 import com.talentlens.dto.request.LoginRequest;
 import com.talentlens.dto.request.RefreshTokenRequest;
 import com.talentlens.dto.request.RegisterRequest;
 import com.talentlens.dto.response.AuthResponse;
+import com.talentlens.dto.response.GoogleCallbackResponse;
 import com.talentlens.dto.response.UserResponse;
 
 public interface AuthService {
@@ -11,4 +14,6 @@ public interface AuthService {
     AuthResponse login(LoginRequest request);
     AuthResponse refresh(RefreshTokenRequest request);
     UserResponse getProfile(String userId);
+    GoogleCallbackResponse googleCallback(GoogleCallbackRequest request);
+    AuthResponse googleCompleteSignup(GoogleCompleteSignupRequest request);
 }

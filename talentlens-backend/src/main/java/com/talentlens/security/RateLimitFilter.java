@@ -20,7 +20,12 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final String[] PROTECTED_PATHS = {"/api/auth/login", "/api/auth/register"};
+    private static final String[] PROTECTED_PATHS = {
+            "/api/auth/login",
+            "/api/auth/register",
+            "/api/auth/google/callback",
+            "/api/auth/google/complete-signup"
+    };
 
     @Value("${app.rate-limit.max-attempts}")
     private int maxAttempts;

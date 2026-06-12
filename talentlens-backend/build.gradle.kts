@@ -33,12 +33,19 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     // JWT
     implementation("io.jsonwebtoken:jjwt-api:0.12.5")
-    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.5")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.6")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.5")
+
+    // Google OIDC — ID token verification with JWKS rotation
+    implementation("com.google.api-client:google-api-client:2.7.0")
+    implementation("com.google.http-client:google-http-client-gson:1.45.0")
 
     // Lombok
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
+
+    // Dotenv — loads .env file into Spring environment
+    implementation("me.paulschwarz:spring-dotenv:4.0.0")
 
     // MapStruct
     implementation("org.mapstruct:mapstruct:1.5.5.Final")

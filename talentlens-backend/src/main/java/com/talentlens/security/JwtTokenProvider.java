@@ -4,6 +4,7 @@ import com.talentlens.exception.UnauthorizedException;
 import com.talentlens.model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtBuilder;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.Map;
 
 @Component
 @Slf4j
@@ -24,6 +26,7 @@ public class JwtTokenProvider {
     private static final String CLAIM_EMAIL = "email";
     private static final String CLAIM_TYPE = "type";
     private static final String TYPE_REFRESH = "REFRESH";
+    private static final String TYPE_SIGNUP_TICKET = "SIGNUP_TICKET";
 
     @Value("${app.jwt.secret}")
     private String secret;
@@ -33,6 +36,9 @@ public class JwtTokenProvider {
 
     @Value("${app.jwt.refresh-expiry-ms}")
     private long refreshExpiryMs;
+
+    @Value("${app.jwt.signup-ticket-expiry-ms}")
+    private long signupTicketExpiryMs;
 
     private SecretKey signingKey;
 
@@ -67,6 +73,16 @@ public class JwtTokenProvider {
                 .compact();
     }
 
+    public String generateSignupTicket(Map<String, Object> claims) {
+        Date now = new Date();
+        JwtBuilder builder = Jwts.builder()
+                .claim(CLAIM_TYPE, TYPE_SIGNUP_TICKET)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + signupTicketExpiryMs));
+        claims.forEach(builder::claim);
+        return builder.signWith(signingKey, Jwts.SIG.HS256).compact();
+    }
+
     public Claims validateAndExtractClaims(String token) {
         try {
             return Jwts.parser()
@@ -94,5 +110,13 @@ public class JwtTokenProvider {
         if (!TYPE_REFRESH.equals(claims.get(CLAIM_TYPE, String.class))) {
             throw new UnauthorizedException("Not a refresh token");
         }
+    }
+
+    public Claims validateSignupTicket(String token) {
+        Claims claims = validateAndExtractClaims(token);
+        if (!TYPE_SIGNUP_TICKET.equals(claims.get(CLAIM_TYPE, String.class))) {
+            throw new UnauthorizedException("Not a signup ticket");
+        }
+        return claims;
     }
 }

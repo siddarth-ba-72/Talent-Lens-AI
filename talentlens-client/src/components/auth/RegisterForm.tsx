@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
+import { GoogleSignInButton } from './GoogleSignInButton'
 import type { AxiosError } from 'axios'
 import type { ApiError } from '@/types/common'
 
@@ -145,6 +146,15 @@ export function RegisterForm() {
                 Create account
               </Button>
             </form>
+
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">or</span>
+              </div>
+            </div>
+
+            <GoogleSignInButton label="Sign up with Google" />
 
             <div className="mt-4 text-center text-sm text-muted-foreground">
               Already have an account?{' '}

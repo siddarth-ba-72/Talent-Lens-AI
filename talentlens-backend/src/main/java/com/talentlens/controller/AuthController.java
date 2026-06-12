@@ -1,9 +1,12 @@
 package com.talentlens.controller;
 
+import com.talentlens.dto.request.GoogleCallbackRequest;
+import com.talentlens.dto.request.GoogleCompleteSignupRequest;
 import com.talentlens.dto.request.LoginRequest;
 import com.talentlens.dto.request.RefreshTokenRequest;
 import com.talentlens.dto.request.RegisterRequest;
 import com.talentlens.dto.response.AuthResponse;
+import com.talentlens.dto.response.GoogleCallbackResponse;
 import com.talentlens.dto.response.UserResponse;
 import com.talentlens.service.AuthService;
 import jakarta.validation.Valid;
@@ -42,5 +45,15 @@ public class AuthController {
     @GetMapping("/me")
     public ResponseEntity<UserResponse> me(@AuthenticationPrincipal String userId) {
         return ResponseEntity.ok(authService.getProfile(userId));
+    }
+
+    @PostMapping("/google/callback")
+    public ResponseEntity<GoogleCallbackResponse> googleCallback(@Valid @RequestBody GoogleCallbackRequest request) {
+        return ResponseEntity.ok(authService.googleCallback(request));
+    }
+
+    @PostMapping("/google/complete-signup")
+    public ResponseEntity<AuthResponse> googleCompleteSignup(@Valid @RequestBody GoogleCompleteSignupRequest request) {
+        return ResponseEntity.ok(authService.googleCompleteSignup(request));
     }
 }

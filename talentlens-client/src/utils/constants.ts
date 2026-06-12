@@ -17,6 +17,18 @@ export const STORAGE_KEYS = {
   THEME: 'tl_theme',
 } as const
 
+export const OAUTH_SESSION_KEYS = {
+  PKCE_VERIFIER: 'tl_pkce_verifier',
+  STATE: 'tl_oauth_state',
+  NONCE: 'tl_oidc_nonce',
+} as const
+
+export const GOOGLE_OAUTH = {
+  AUTHORIZE_URL: 'https://accounts.google.com/o/oauth2/v2/auth',
+  SCOPE: 'openid email profile',
+  CALLBACK_PATH: '/oauth/google/callback',
+} as const
+
 export const QUERY_KEYS = {
   SEARCHES: 'searches',
   SEARCH: 'search',
