@@ -1,4 +1,6 @@
-export type CandidateSource = 'GITHUB' | 'STACKOVERFLOW'
+import type { Platform } from './search'
+
+export type CandidateSource = Platform
 
 export interface ScoreBreakdown {
   skillMatch: number
@@ -30,6 +32,10 @@ export interface Candidate {
   skills: string[]
   experience: Experience[]
   education: Education[]
+  // Short reasons the candidate was picked, e.g. "Top answerer in [go]".
+  signals?: string[]
+  // They say they are looking (GitHub "hireable", an HN "Who wants to be hired?" post).
+  openToWork?: boolean
   matchScore: number
   scoreBreakdown: ScoreBreakdown
   isActive: boolean

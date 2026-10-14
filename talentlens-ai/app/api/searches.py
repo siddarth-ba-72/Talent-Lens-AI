@@ -109,7 +109,9 @@ async def trigger_sourcing(
     user: User = Depends(require_recruiter),
     session: AsyncSession = Depends(get_session),
 ) -> SourcingStatusResponse:
-    task = await sourcing_service.trigger_sourcing(session, user, search_id, request.platforms, background_tasks)
+    task = await sourcing_service.trigger_sourcing(
+        session, user, search_id, request.platforms, background_tasks, auto=request.auto
+    )
     return SourcingStatusResponse.from_task(task)
 
 

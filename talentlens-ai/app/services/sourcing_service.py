@@ -10,7 +10,7 @@ from pymongo.errors import DuplicateKeyError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.db.documents import CandidateDocument
 from app.db.models import Search, SourcingStatus, SourcingTask, TaskStatus, User, utcnow
 from app.db.postgres import session_factory
@@ -25,11 +25,12 @@ from app.models.candidate_models import (
 from app.models.candidate_models import SourcingStatus as ResultStatus
 from app.models.jd_models import ParsedJdModel
 from app.services.search_service import assert_ownership, get_search_or_404, get_viewable_search
+from app.services.sources.registry import PLATFORMS, is_available, suggest_platforms
 
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_PLATFORMS = ("GITHUB", "STACKOVERFLOW", "LEETCODE", "PEOPLES_DATA")
+ALLOWED_PLATFORMS = tuple(platform.value for platform in PLATFORMS)
 MAX_CANDIDATES_PER_RUN = 20
 # How long past the sourcing timeout a task may sit unfinished before it is
 # considered orphaned (its worker process died).
@@ -43,7 +44,10 @@ async def trigger_sourcing(
     search_id: str,
     platforms: list[str],
     background_tasks: BackgroundTasks,
+    *,
+    auto: bool = False,
 ) -> SourcingTask:
+    """Start a run. With `auto`, the platforms are the available ones suggested for the JD."""
     # Row lock so two concurrent triggers cannot both start a run.
     search = await get_search_or_404(session, search_id, for_update=True)
     assert_ownership(search, user)
@@ -53,7 +57,14 @@ async def trigger_sourcing(
         if latest is None or not _is_orphaned(latest):
             raise InvalidFileError("Sourcing is already in progress for this search")
         await _fail_orphan(session, latest)
-    platforms = _validate_platforms(platforms)
+    parsed_jd = ParsedJdModel.model_validate(search.parsed_jd)
+    settings = get_settings()
+    if auto:
+        platforms = [platform.value for platform in suggest_platforms(parsed_jd, settings)]
+        if not platforms:
+            raise InvalidFileError("No sourcing platform is configured on this server")
+    else:
+        platforms = _validate_platforms(platforms, settings)
 
     now = utcnow()
     run_id = f"run_{now:%Y%m%d_%H%M%S}_{now.microsecond // 1000:03d}"
@@ -74,7 +85,7 @@ async def trigger_sourcing(
         taskId=task.id,
         searchId=search.id,
         runId=run_id,
-        parsedJd=ParsedJdModel.model_validate(search.parsed_jd),
+        parsedJd=parsed_jd,
         platforms=[SourcePlatform(platform) for platform in platforms],
         timestamp=now,
     )
@@ -179,10 +190,14 @@ async def _latest_task(session: AsyncSession, search_id: str) -> Optional[Sourci
     )
 
 
-def _validate_platforms(platforms: list[str]) -> list[str]:
+def _validate_platforms(platforms: list[str], settings: Settings) -> list[str]:
+    if not platforms:
+        raise InvalidFileError("Select at least one platform")
     for platform in platforms:
         if platform not in ALLOWED_PLATFORMS:
             raise InvalidFileError(f"Invalid platform: {platform}. Allowed: {', '.join(ALLOWED_PLATFORMS)}")
+        if not is_available(SourcePlatform(platform), settings):
+            raise InvalidFileError(f"{platform} is not configured on this server")
     return list(dict.fromkeys(platforms))
 
 
@@ -252,6 +267,8 @@ async def _persist_candidates(search_id: str, raw_run_id: Optional[str], candida
             bio=candidate.bio,
             location=candidate.location,
             experience=candidate.experience,
+            signals=candidate.signals,
+            openToWork=candidate.openToWork,
             matchScore=candidate.matchScore,
             scoreBreakdown=candidate.scoreBreakdown,
             isActive=True,

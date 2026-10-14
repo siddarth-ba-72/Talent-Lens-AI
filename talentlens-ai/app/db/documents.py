@@ -25,6 +25,8 @@ class CandidateDocument(Document):
     bio: Optional[str] = None
     location: Optional[str] = None
     experience: Optional[str] = None
+    signals: list[str] = Field(default_factory=list)
+    openToWork: bool = False
     matchScore: int
     scoreBreakdown: ScoreBreakdownModel
     isActive: bool = True

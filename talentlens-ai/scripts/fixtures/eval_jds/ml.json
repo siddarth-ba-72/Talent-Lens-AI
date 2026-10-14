@@ -1,0 +1,9 @@
+{
+  "skills": ["Machine learning", "NLP", "Model evaluation", "Python"],
+  "responsibilities": ["Fine-tune and evaluate language models", "Ship models behind production APIs"],
+  "experienceLevel": "Mid-level (3+ years)",
+  "qualifications": ["3+ years in applied ML"],
+  "technologies": ["Python", "PyTorch", "Transformers", "LLM", "FastAPI"],
+  "domain": "AI",
+  "summary": "ML engineer to fine-tune and deploy LLM-based NLP models."
+}

@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom'
-import { Calendar, Users, ArrowUpRight, RefreshCw, GitBranch, Hash } from 'lucide-react'
+import { Calendar, Users, ArrowUpRight, RefreshCw } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Search, SearchStatus } from '@/types/search'
 import { getSearchStatusColor, getSearchStatusLabel, formatRelativeTime } from '@/utils/formatters'
+import { getPlatformMeta } from '@/utils/platforms'
 import { cn } from '@/lib/utils'
 
 interface SearchCardProps {
@@ -76,12 +77,15 @@ export function SearchCard({ search }: SearchCardProps) {
               <Calendar className="h-3.5 w-3.5" />
               {formatRelativeTime(search.createdAt)}
             </span>
-            {search.platforms?.map((p) => (
-              <span key={p} className="flex items-center gap-1 text-xs">
-                {p === 'GITHUB' ? <GitBranch className="h-3 w-3" /> : <Hash className="h-3 w-3" />}
-                {p === 'GITHUB' ? 'GitHub' : 'Stack Overflow'}
-              </span>
-            ))}
+            {search.platforms?.map((p) => {
+              const { icon: Icon, label } = getPlatformMeta(p)
+              return (
+                <span key={p} className="flex items-center gap-1 text-xs">
+                  <Icon className="h-3 w-3" />
+                  {label}
+                </span>
+              )
+            })}
           </div>
           <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-all group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
         </div>

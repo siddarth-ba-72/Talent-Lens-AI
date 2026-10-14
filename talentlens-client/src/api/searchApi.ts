@@ -1,5 +1,13 @@
 import axiosInstance from './axiosInstance'
-import type { Platform, Search, SearchFilters, SearchStatus, SourcingRequest, SourcingStatusResponse } from '@/types/search'
+import type {
+  Platform,
+  PlatformAvailability,
+  Search,
+  SearchFilters,
+  SearchStatus,
+  SourcingRequest,
+  SourcingStatusResponse,
+} from '@/types/search'
 import type { PageResponse } from '@/types/common'
 
 // The API names a search's sourcing state differently from the UI's Search model.
@@ -80,5 +88,11 @@ export async function getSourcingStatus(id: string): Promise<SourcingStatusRespo
 // Newest first.
 export async function getSourcingRuns(id: string): Promise<SourcingStatusResponse[]> {
   const res = await axiosInstance.get<SourcingStatusResponse[]>(`/searches/${id}/runs`)
+  return res.data
+}
+
+// Every sourcing platform, and whether the server is configured to use it.
+export async function getPlatformAvailability(): Promise<PlatformAvailability[]> {
+  const res = await axiosInstance.get<PlatformAvailability[]>('/sourcing/platforms')
   return res.data
 }

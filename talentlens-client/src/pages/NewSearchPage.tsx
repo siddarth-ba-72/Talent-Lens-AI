@@ -25,6 +25,7 @@ export default function NewSearchPage() {
   const [jdText, setJdText] = useState('')
   const [jdFile, setJdFile] = useState<File | null>(null)
   const [platforms, setPlatforms] = useState<Platform[]>(DEFAULT_PLATFORMS)
+  const [autoPlatforms, setAutoPlatforms] = useState(true)
   const [createdSearch, setCreatedSearch] = useState<SearchType | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [platformError, setPlatformError] = useState<string | null>(null)
@@ -51,7 +52,7 @@ export default function NewSearchPage() {
   const sourcingMutation = useMutation({
     mutationFn: async () => {
       if (!createdSearch) throw new Error('No search created')
-      return triggerSourcing(createdSearch.id, { platforms })
+      return triggerSourcing(createdSearch.id, autoPlatforms ? { auto: true } : { platforms })
     },
     onSuccess: () => {
       addToast({ type: 'success', title: 'Sourcing started!', description: 'We\'re finding candidates for you.' })
@@ -77,7 +78,7 @@ export default function NewSearchPage() {
 
   const handleSource = () => {
     setPlatformError(null)
-    if (platforms.length === 0) {
+    if (!autoPlatforms && platforms.length === 0) {
       setPlatformError('Please select at least one platform.')
       return
     }
@@ -193,7 +194,13 @@ export default function NewSearchPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Label>Platforms</Label>
-            <PlatformSelector value={platforms} onChange={setPlatforms} error={platformError ?? undefined} />
+            <PlatformSelector
+              value={platforms}
+              onChange={setPlatforms}
+              auto={autoPlatforms}
+              onAutoChange={setAutoPlatforms}
+              error={platformError ?? undefined}
+            />
             <Button
               onClick={handleSource}
               loading={sourcingMutation.isPending}

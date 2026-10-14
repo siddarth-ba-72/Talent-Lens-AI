@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 import type { CandidateFilters } from '@/types/candidate'
+import { PLATFORM_META, PLATFORMS } from '@/utils/platforms'
 
 interface CandidateFiltersBarProps {
   filters: CandidateFilters
@@ -37,8 +38,9 @@ export function CandidateFiltersBar({ filters, onChange, onReset }: CandidateFil
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="ALL">All sources</SelectItem>
-          <SelectItem value="GITHUB">GitHub</SelectItem>
-          <SelectItem value="STACKOVERFLOW">Stack Overflow</SelectItem>
+          {PLATFORMS.map((platform) => (
+            <SelectItem key={platform} value={platform}>{PLATFORM_META[platform].label}</SelectItem>
+          ))}
         </SelectContent>
       </Select>
 

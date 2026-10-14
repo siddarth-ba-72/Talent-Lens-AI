@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.db.models import Search, SourcingTask
 from app.models.jd_models import ParsedJdModel
@@ -17,7 +17,21 @@ class CreateSearchRequest(BaseModel):
 
 
 class SourcingRequest(BaseModel):
-    platforms: list[str] = Field(min_length=1)
+    platforms: list[str] = Field(default_factory=list)
+    # Let the server pick the platforms that suit the JD (ignores `platforms`).
+    auto: bool = False
+
+    @model_validator(mode="after")
+    def _require_platforms(self) -> "SourcingRequest":
+        if not self.auto and not self.platforms:
+            raise ValueError("Select at least one platform, or set auto")
+        return self
+
+
+class PlatformAvailabilityResponse(BaseModel):
+    platform: str
+    # False when a credential the platform needs is not configured on the server.
+    available: bool
 
 
 class SearchResponse(BaseModel):

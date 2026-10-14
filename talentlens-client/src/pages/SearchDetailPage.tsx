@@ -18,10 +18,11 @@ import { useSearch } from '@/hooks/useSearch'
 import { useCandidates } from '@/hooks/useCandidates'
 import { useSourcingStatus } from '@/hooks/useSourcingStatus'
 import { useSourcingRuns } from '@/hooks/useSourcingRuns'
+import { usePlatforms } from '@/hooks/usePlatforms'
 import { deleteSearch, triggerSourcing } from '@/api/searchApi'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
-import { QUERY_KEYS, CANDIDATE_PAGE_SIZE, DEFAULT_PLATFORMS } from '@/utils/constants'
+import { QUERY_KEYS, CANDIDATE_PAGE_SIZE } from '@/utils/constants'
 import { pluralize } from '@/utils/formatters'
 import type { CandidateFilters } from '@/types/candidate'
 import { cn } from '@/lib/utils'
@@ -39,6 +40,7 @@ export default function SearchDetailPage() {
   const queryClient = useQueryClient()
   const { addToast } = useUiStore()
   const isRecruiter = useAuthStore((s) => s.user?.role === 'RECRUITER')
+  const { isAvailable } = usePlatforms(isRecruiter)
 
   const [jdCollapsed, setJdCollapsed] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -63,10 +65,13 @@ export default function SearchDetailPage() {
     onError: () => addToast({ type: 'error', title: 'Failed to delete search' }),
   })
 
-  // Starts a new run on the same platforms. Earlier runs keep their candidates and stay selectable.
+  // Starts a new run on the same platforms (those still available), or the JD's
+  // recommended ones when none are left. Earlier runs keep their candidates and stay selectable.
   const resourceMutation = useMutation({
-    mutationFn: () =>
-      triggerSourcing(id!, { platforms: search?.platforms.length ? search.platforms : DEFAULT_PLATFORMS }),
+    mutationFn: () => {
+      const previous = (search?.platforms ?? []).filter(isAvailable)
+      return triggerSourcing(id!, previous.length ? { platforms: previous } : { auto: true })
+    },
     onSuccess: (task) => {
       // Seeding the status starts its polling straight away.
       queryClient.setQueryData([QUERY_KEYS.SOURCING_STATUS, id], task)

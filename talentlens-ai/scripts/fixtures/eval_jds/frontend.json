@@ -1,0 +1,9 @@
+{
+  "skills": ["Accessibility", "Component design", "TypeScript"],
+  "responsibilities": ["Build the customer-facing web app", "Own the design system"],
+  "experienceLevel": "Senior",
+  "qualifications": ["Shipped large React applications"],
+  "technologies": ["React", "TypeScript", "Next.js", "GraphQL", "Tailwind"],
+  "domain": "SaaS",
+  "summary": "Senior frontend engineer for a React and Next.js product."
+}

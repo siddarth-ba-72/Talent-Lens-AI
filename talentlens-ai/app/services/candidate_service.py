@@ -14,6 +14,7 @@ from app.db.models import SourcingTask, TaskStatus, User
 from app.errors import ForbiddenError, ResourceNotFoundError
 from app.models.candidate_models import CandidateResponse
 from app.services.search_service import get_viewable_search
+from app.services.skill_vocabulary import canonical
 
 
 _SORT_FIELDS = {"matchScore", "createdAt", "sourcedAt", "name"}
@@ -43,6 +44,8 @@ def to_response(candidate: CandidateDocument) -> CandidateResponse:
         skills=candidate.skills,
         bio=candidate.bio,
         location=candidate.location,
+        signals=candidate.signals,
+        openToWork=candidate.openToWork,
         matchScore=candidate.matchScore,
         scoreBreakdown=candidate.scoreBreakdown,
         sourcedAt=candidate.sourcedAt,
@@ -55,7 +58,9 @@ def build_filter(search_id: str, params: CandidateFilterParams) -> dict[str, Any
     if params.run_id:
         conditions.append({"runId": params.run_id})
     if params.skills:
-        conditions.append({"skills": {"$in": params.skills}})
+        # Sourced skills are stored in canonical form ("postgresql"); older runs kept the platform's spelling.
+        wanted = list(dict.fromkeys([*params.skills, *(canonical(skill) for skill in params.skills)]))
+        conditions.append({"skills": {"$in": wanted}})
     if params.source and params.source.strip():
         conditions.append({"source": params.source})
     if params.min_score is not None:
