@@ -1,6 +1,6 @@
 # TalentLens
 
-TalentLens is an AI-powered candidate sourcing and scoring tool for recruiters. A recruiter submits a job description — as pasted text or an uploaded document — and TalentLens automatically parses it, searches public platforms (GitHub and Stack Overflow) for matching profiles, scores each candidate against the JD using an LLM, and returns a ranked list ready to review or export.
+TalentLens is an AI-powered candidate sourcing and scoring tool for recruiters. A recruiter submits a job description — as pasted text or an uploaded document — and TalentLens automatically parses it, searches public developer platforms for matching profiles, scores each candidate against the JD, and returns a ranked list ready to review or export.
 
 ---
 
@@ -12,18 +12,31 @@ When a recruiter submits a JD, the AI service reads it and extracts structured i
 
 ### Candidate Sourcing
 
-Once the JD is parsed and the search is saved, the recruiter can trigger candidate sourcing. TalentLens constructs targeted search queries from the parsed JD and runs them against the GitHub and Stack Overflow APIs simultaneously. When sourcing completes, the results are ready in the search detail view.
+Once the JD is parsed and the search is saved, the recruiter can trigger candidate sourcing. TalentLens constructs targeted search queries from the parsed JD and runs them against the selected platforms simultaneously. By default it picks the platforms that suit the JD; the recruiter can also choose them:
+
+| Platform | Who it finds |
+|---|---|
+| GitHub | Contributors to active projects in the JD's stack, and matching profiles ("hireable" users are flagged) |
+| Stack Overflow | Top answerers in the JD's tags who are still active |
+| Hacker News | People who posted in the monthly "Ask HN: Who wants to be hired?" thread (all open to work) |
+| dev.to | Authors of well-received posts on the JD's topics |
+| Hugging Face | Authors of models in the JD's ML stack (ML roles) |
+| npm / crates.io | Maintainers of widely used JavaScript packages / Rust crates |
+| GitLab | Members of active GitLab.com projects in the JD's stack |
+| Research papers (OpenAlex) | Authors of recent papers on the JD's topics (research roles) |
+
+Each candidate comes with short signals saying why they were picked, e.g. "Top answerer in [go]". When sourcing completes, the results are ready in the search detail view.
 
 Each sourcing run is identified by a unique run ID, so a recruiter can re-run sourcing for the same search (to get fresh results) without losing the history of previous runs.
 
 ### Candidate Scoring and Ranking
 
-Every sourced candidate is scored by the OpenAI LLM. The score is computed deterministically:
+Every sourced candidate is scored deterministically (no LLM involved):
 
-- **Skill match** accounts for 60% of the score — how closely the candidate's publicly visible skills align with those required in the JD.
+- **Skill match** accounts for 60% of the score — how many of the JD's technologies appear among the candidate's publicly visible skills (spellings are normalised, so `golang` matches `Go`).
 - **Experience match** accounts for 40% — how well the candidate's background fits the stated experience level.
 
-The final score is a number from 0 to 100. Candidates are presented ranked from highest to lowest. Up to 20 top candidates are returned per sourcing run.
+The final score is a number from 0 to 100. Candidates are presented ranked from highest to lowest, and among equal scores people who say they are looking come first. Up to 20 top candidates are returned per sourcing run, with up to 3 places kept for each platform that found anyone.
 
 ### Access Control and Search Sharing
 
@@ -60,7 +73,7 @@ flowchart TB
 
     subgraph External["External APIs"]
         LLM["OpenAI / Gemini"]
-        GH["GitHub API"]
+        GH["Sourcing APIs\nGitHub, Stack Overflow, HN, …"]
         Google["Google sign-in"]
     end
 
@@ -150,8 +163,9 @@ Fill in `.env`. The database defaults already match `docker-compose.yml`; replac
 | `DATABASE_URL` | PostgreSQL link, e.g. `postgresql://user:pass@host:5432/db` (`?sslmode=require` is supported) |
 | `MONGODB_URI`, `MONGODB_DATABASE` | MongoDB link and database name |
 | `JWT_SECRET` | Token signing secret, at least 32 characters |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google sign-in (optional) |
-| `LLM_PROVIDER`, `OPENAI_API_KEY` / `GEMINI_API_KEY`, `GITHUB_TOKEN` | LLM and sourcing credentials |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google sign-in (optional). `GOOGLE_REDIRECT_URI` lists every origin you sign in from, comma-separated, e.g. `http://localhost:9000/oauth/google/callback,http://localhost:5173/oauth/google/callback`; register each in Google Cloud Console |
+| `LLM_PROVIDER`, `OPENAI_API_KEY` / `GEMINI_API_KEY` | LLM credentials |
+| `GITHUB_TOKEN`, `STACKEXCHANGE_KEY`, `GITLAB_TOKEN`, `HF_TOKEN`, `OPENALEX_API_KEY`, `SOURCING_CONTACT` | Sourcing credentials; see `.env.example` for which are required. Platforms without theirs show as "Not configured" |
 
 ### Step 3: Build the UI
 
@@ -209,8 +223,9 @@ TalentLens deploys to Vercel as one FastAPI function that serves both the API an
    | `DATABASE_URL` | Hosted PostgreSQL. On Neon, use the pooled (`-pooler`) connection string. |
    | `MONGODB_URI`, `MONGODB_DATABASE` | On Atlas, allow network access from anywhere (`0.0.0.0/0`); Vercel functions have no fixed outbound IPs. |
    | `JWT_SECRET` | A new secret per environment, at least 32 characters. |
-   | `LLM_PROVIDER`, `OPENAI_API_KEY` / `GEMINI_API_KEY`, `GITHUB_TOKEN` | LLM and sourcing credentials. |
-   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | `GOOGLE_REDIRECT_URI` is `https://<your-domain>/oauth/google/callback`, registered in Google Cloud Console. |
+   | `LLM_PROVIDER`, `OPENAI_API_KEY` / `GEMINI_API_KEY` | LLM credentials. |
+   | `GITHUB_TOKEN`, `STACKEXCHANGE_KEY`, … | Sourcing credentials (see `talentlens-ai/.env.example`). Set `STACKEXCHANGE_KEY`: without it Stack Overflow allows 300 requests a day per IP, and Vercel's outbound IPs are shared. |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | `GOOGLE_REDIRECT_URI` is `https://<your-domain>/oauth/google/callback`, registered in Google Cloud Console. If people also open the `*.vercel.app` address, list both, comma-separated. |
    | `VITE_GOOGLE_CLIENT_ID` | Read at build time and compiled into the UI. |
 
    `APP_ENV` can stay unset: production and preview deployments default to `prod` (`Secure` cookies, no `/docs`).

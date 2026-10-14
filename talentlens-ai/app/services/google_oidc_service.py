@@ -33,22 +33,35 @@ class GoogleOidcService:
     def __init__(self, settings: Settings):
         self._settings = settings
 
-    async def exchange_code_and_verify(self, code: str, code_verifier: str, expected_nonce: str) -> GoogleIdentity:
+    async def exchange_code_and_verify(
+        self, code: str, code_verifier: str, expected_nonce: str, redirect_uri: Optional[str] = None
+    ) -> GoogleIdentity:
+        """`redirect_uri` is the one the browser sent Google to; Google only accepts the
+        exchange with that same URI. It must be one of GOOGLE_REDIRECT_URI."""
         settings = self._settings
-        if not (settings.google_client_id and settings.google_client_secret and settings.google_redirect_uri):
+        allowed = settings.google_redirect_uris
+        if not (settings.google_client_id and settings.google_client_secret and allowed):
             raise OidcError("google_not_configured", "Google sign-in is not configured on this server")
+        if redirect_uri is None:
+            redirect_uri = allowed[0]
+        elif redirect_uri not in allowed:
+            logger.warning("Google sign-in from unlisted redirect URI %s (allowed: %s)", redirect_uri, allowed)
+            raise OidcError(
+                "redirect_uri_not_allowed",
+                f"Sign-in came back to {redirect_uri}, which is not in GOOGLE_REDIRECT_URI on this server",
+            )
 
-        raw_id_token = await self._exchange_code_for_id_token(code, code_verifier)
+        raw_id_token = await self._exchange_code_for_id_token(code, code_verifier, redirect_uri)
         return await self._verify_id_token(raw_id_token, expected_nonce)
 
-    async def _exchange_code_for_id_token(self, code: str, code_verifier: str) -> str:
+    async def _exchange_code_for_id_token(self, code: str, code_verifier: str, redirect_uri: str) -> str:
         settings = self._settings
         form = {
             "grant_type": "authorization_code",
             "code": code,
             "client_id": settings.google_client_id,
             "client_secret": settings.google_client_secret,
-            "redirect_uri": settings.google_redirect_uri,
+            "redirect_uri": redirect_uri,
             "code_verifier": code_verifier,
         }
 

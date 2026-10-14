@@ -32,6 +32,12 @@ export const GOOGLE_OAUTH = {
   CALLBACK_PATH: '/oauth/google/callback',
 } as const
 
+// Where Google sends the browser back to: this page's own origin, so the dev server
+// (:5173) and the service (:9000) each work. The server must list it in GOOGLE_REDIRECT_URI.
+export function googleRedirectUri(): string {
+  return `${window.location.origin}${GOOGLE_OAUTH.CALLBACK_PATH}`
+}
+
 export const QUERY_KEYS = {
   SEARCHES: 'searches',
   SEARCH: 'search',

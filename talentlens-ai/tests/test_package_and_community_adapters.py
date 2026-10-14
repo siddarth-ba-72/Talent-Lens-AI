@@ -59,7 +59,7 @@ def test_huggingface_skips_reuploads_and_orgs(fake_http):
                 {"id": "bigorg/flagship", "likes": 500, "tags": ["pytorch", "text-generation"]},
                 {"id": "alice/ner-small", "likes": 50, "tags": ["pytorch", "token-classification"]},
             ]
-            if "filter" in request.url.params
+            if "library" in request.url.params
             else [{"id": "alice/ner-small", "tags": ["pytorch", "token-classification", "license:mit"]}]
         )),
         "huggingface.co/api/users/alice/overview": {
@@ -132,3 +132,20 @@ def test_crates_needs_a_contact(fake_http):
 
     assert asyncio.run(CratesSourceToolAdapter(None, transport=transport).fetch_candidates([], ParsedJdModel())) == []
     assert transport.requests == []
+
+
+def test_huggingface_retries_a_busy_hub(fake_http, monkeypatch):
+    from app.services.sources import huggingface
+
+    async def no_wait(seconds):
+        return None
+
+    monkeypatch.setattr(huggingface.asyncio, "sleep", no_wait)
+    answers = iter([httpx.Response(504, json={"error": "busy"}), httpx.Response(200, json=[])])
+    transport = fake_http({"huggingface.co/api/models": lambda request: next(answers)})
+
+    adapter = HuggingFaceSourceToolAdapter(None, transport=transport)
+
+    assert asyncio.run(adapter.fetch_candidates([], ParsedJdModel(technologies=["PyTorch"]))) == []
+    assert len(transport.requests) == 2
+    assert transport.requests[0].url.params["library"] == "pytorch"

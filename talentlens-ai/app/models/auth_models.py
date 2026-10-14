@@ -66,6 +66,8 @@ class GoogleCallbackRequest(BaseModel):
     code: str
     codeVerifier: str
     nonce: str
+    # The redirect URI the browser used; the server only accepts ones in GOOGLE_REDIRECT_URI.
+    redirectUri: Optional[str] = None
 
     _fields_not_blank = field_validator("code", "codeVerifier", "nonce")(_not_blank)
 

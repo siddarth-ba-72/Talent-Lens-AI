@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { useUiStore } from '@/stores/uiStore'
-import { OAUTH_SESSION_KEYS, GOOGLE_OAUTH } from '@/utils/constants'
+import { OAUTH_SESSION_KEYS, GOOGLE_OAUTH, googleRedirectUri } from '@/utils/constants'
 import { generateVerifier, challengeFromVerifier } from '@/utils/pkce'
 
 export function GoogleSignInButton({ label = 'Continue with Google' }: { label?: string }) {
@@ -28,7 +28,7 @@ export function GoogleSignInButton({ label = 'Continue with Google' }: { label?:
 
     const params = new URLSearchParams({
       client_id: clientId,
-      redirect_uri: `${window.location.origin}${GOOGLE_OAUTH.CALLBACK_PATH}`,
+      redirect_uri: googleRedirectUri(),
       response_type: 'code',
       scope: GOOGLE_OAUTH.SCOPE,
       code_challenge: challenge,

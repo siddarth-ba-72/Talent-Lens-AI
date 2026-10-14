@@ -33,6 +33,7 @@ export interface GoogleCallbackRequest {
   code: string
   codeVerifier: string
   nonce: string
+  redirectUri: string
 }
 
 export interface GoogleCallbackResponse {

@@ -7,7 +7,7 @@ import { RoleSelectionForm } from '@/components/auth/RoleSelectionForm'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
 import { googleCallback } from '@/api/googleAuthApi'
-import { OAUTH_SESSION_KEYS } from '@/utils/constants'
+import { OAUTH_SESSION_KEYS, googleRedirectUri } from '@/utils/constants'
 import type { AxiosError } from 'axios'
 import type { ApiError } from '@/types/common'
 
@@ -71,7 +71,8 @@ export default function OAuthCallbackPage() {
       return
     }
 
-    googleCallback({ code, codeVerifier: verifier, nonce })
+    // Google only completes the exchange with the same redirect URI the sign-in started with.
+    googleCallback({ code, codeVerifier: verifier, nonce, redirectUri: googleRedirectUri() })
       .then((res) => {
         if (res.needsRoleSelection && res.signupTicket && res.email) {
           setPending({ signupTicket: res.signupTicket, email: res.email, name: res.name })
