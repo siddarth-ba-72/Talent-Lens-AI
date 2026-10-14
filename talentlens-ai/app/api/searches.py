@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
@@ -105,10 +105,11 @@ async def delete_search(
 async def trigger_sourcing(
     search_id: str,
     request: SourcingRequest,
+    background_tasks: BackgroundTasks,
     user: User = Depends(require_recruiter),
     session: AsyncSession = Depends(get_session),
 ) -> SourcingStatusResponse:
-    task = await sourcing_service.trigger_sourcing(session, user, search_id, request.platforms)
+    task = await sourcing_service.trigger_sourcing(session, user, search_id, request.platforms, background_tasks)
     return SourcingStatusResponse.from_task(task)
 
 

@@ -20,7 +20,7 @@ export function JdFileUpload({ value, onChange, error }: JdFileUploadProps) {
       return `Unsupported file type. Please use ${ALLOWED_FILE_TYPES.join(', ')}`
     }
     if (file.size > MAX_FILE_SIZE_BYTES) {
-      return `File is too large. Maximum size is 5 MB.`
+      return `File is too large. Maximum size is 4 MB.`
     }
     return null
   }
@@ -90,7 +90,7 @@ export function JdFileUpload({ value, onChange, error }: JdFileUploadProps) {
           {dragging ? 'Drop to upload' : 'Drag & drop or click to browse'}
         </p>
         <p className="text-xs text-muted-foreground">
-          Supports .txt, .pdf, .docx — max 5 MB
+          Supports .txt, .pdf, .docx — max 4 MB
         </p>
         <input
           type="file"

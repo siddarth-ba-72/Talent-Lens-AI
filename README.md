@@ -96,7 +96,7 @@ Tables and indexes are created on startup. Deleting a search removes its tasks, 
 ### Request flow
 
 - **JD parsing** runs inside the request that creates a search (`POST /api/searches/jd-text` or `/jd-file`). The LLM call is moved to a worker thread so the server stays responsive.
-- **Sourcing** is asynchronous. `POST /api/searches/{id}/source` records a task, returns `202`, and runs the workflow as a background task in the same process: generate queries, fetch profiles, score, store the top 20. The UI polls `GET /api/searches/{id}/source-status`. A run that exceeds the timeout, or that was interrupted by a restart, is marked `FAILED`.
+- **Sourcing** is asynchronous. `POST /api/searches/{id}/source` records a task, returns `202`, and then runs the workflow as a FastAPI background task inside the same request: generate queries, fetch profiles, score, store the top 20. The UI polls `GET /api/searches/{id}/source-status`. A run that exceeds the timeout, or whose process died, is marked `FAILED` (at the next startup, or when its status is next polled).
 - **Re-sourcing** calls the same endpoint again. Every run keeps its own candidates (keyed by `runId`); `GET /api/searches/{id}/runs` lists them newest first. The candidate list and export take an optional `runId` and otherwise show the latest completed run.
 
 ### Authentication and session security
@@ -197,14 +197,42 @@ Google sign-in from the dev server needs `http://localhost:5173/oauth/google/cal
 
 ## Deployment
 
-The root `Dockerfile` builds the UI and packages it with the service into one image:
+### Vercel
+
+TalentLens deploys to Vercel as one FastAPI function that serves both the API and the built UI. The settings live in `talentlens-ai/vercel.json` (build command, function limits) and under `[tool.vercel]` in `talentlens-ai/pyproject.toml` (entrypoint `app.main:app`). The UI is served by the function rather than Vercel's CDN, so the UI shell keeps the headers the app sets (Content-Security-Policy, `X-Frame-Options`).
+
+1. **Import the repository** in Vercel and set **Root Directory** to `talentlens-ai`. The FastAPI preset is detected. Keep **Include files outside the Root Directory in the Build Step** enabled: the build command runs `npm ci && npm run build` in `../talentlens-client`, which writes the UI into `talentlens-ai/static/` before the function is bundled.
+2. **Add environment variables** for Production (and Preview, if you use it):
+
+   | Variable | Notes |
+   |---|---|
+   | `DATABASE_URL` | Hosted PostgreSQL. On Neon, use the pooled (`-pooler`) connection string. |
+   | `MONGODB_URI`, `MONGODB_DATABASE` | On Atlas, allow network access from anywhere (`0.0.0.0/0`); Vercel functions have no fixed outbound IPs. |
+   | `JWT_SECRET` | A new secret per environment, at least 32 characters. |
+   | `LLM_PROVIDER`, `OPENAI_API_KEY` / `GEMINI_API_KEY`, `GITHUB_TOKEN` | LLM and sourcing credentials. |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | `GOOGLE_REDIRECT_URI` is `https://<your-domain>/oauth/google/callback`, registered in Google Cloud Console. |
+   | `VITE_GOOGLE_CLIENT_ID` | Read at build time and compiled into the UI. |
+
+   `APP_ENV` can stay unset: production and preview deployments default to `prod` (`Secure` cookies, no `/docs`).
+3. **Deploy** by pushing to the connected branch, or with `vercel deploy --prod` from the repo root after `vercel link`. The root `.vercelignore` keeps `.env` files and local environments out of CLI uploads.
+
+What to expect on Vercel:
+
+- **Sourcing** runs after the `202` is sent but within the same invocation, so it must finish inside the function's `maxDuration` (300 s, the Hobby maximum). Keep `SOURCING_TIMEOUT_SECONDS` (default 120) below that.
+- **Uploads** are capped at 4 MB, because Vercel rejects request bodies over 4.5 MB.
+- **Login rate limits** are kept in memory, so each function instance counts attempts separately.
+- **Google sign-in** only works on origins registered in Google Cloud Console, so it will not work on per-commit preview URLs unless you register them.
+
+### Docker
+
+The root `Dockerfile` builds the UI and packages it with the service into one image, for any container host:
 
 ```bash
 docker build --build-arg VITE_GOOGLE_CLIENT_ID=<client id> -t talentlens .
 docker run -p 9000:9000 --env-file talentlens-ai/.env -e APP_ENV=prod talentlens
 ```
 
-With `APP_ENV=prod` the session cookie is `Secure` (HTTPS only) and `/docs` is off. Run it as a long-lived process: sourcing runs as an in-process background task and login rate limits are kept in memory, so serverless platforms that freeze the process between requests are not a fit.
+With `APP_ENV=prod` the session cookie is `Secure` (HTTPS only) and `/docs` is off.
 
 ---
 

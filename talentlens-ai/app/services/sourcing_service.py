@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from fastapi import BackgroundTasks
 from pymongo.errors import DuplicateKeyError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,18 +34,25 @@ MAX_CANDIDATES_PER_RUN = 20
 # How long past the sourcing timeout a task may sit unfinished before it is
 # considered orphaned (its worker process died).
 _ORPHAN_GRACE_SECONDS = 60
-
-# Strong references: the event loop only keeps weak ones to running tasks.
-_running: set[asyncio.Task[None]] = set()
+_OPEN_STATUSES = (TaskStatus.PENDING, TaskStatus.IN_PROGRESS)
 
 
-async def trigger_sourcing(session: AsyncSession, user: User, search_id: str, platforms: list[str]) -> SourcingTask:
+async def trigger_sourcing(
+    session: AsyncSession,
+    user: User,
+    search_id: str,
+    platforms: list[str],
+    background_tasks: BackgroundTasks,
+) -> SourcingTask:
     # Row lock so two concurrent triggers cannot both start a run.
     search = await get_search_or_404(session, search_id, for_update=True)
     assert_ownership(search, user)
 
     if search.sourcing_status == SourcingStatus.IN_PROGRESS:
-        raise InvalidFileError("Sourcing is already in progress for this search")
+        latest = await _latest_task(session, search.id)
+        if latest is None or not _is_orphaned(latest):
+            raise InvalidFileError("Sourcing is already in progress for this search")
+        await _fail_orphan(session, latest)
     platforms = _validate_platforms(platforms)
 
     now = utcnow()
@@ -70,22 +78,23 @@ async def trigger_sourcing(session: AsyncSession, user: User, search_id: str, pl
         platforms=[SourcePlatform(platform) for platform in platforms],
         timestamp=now,
     )
-    background = asyncio.create_task(execute_sourcing(payload))
-    _running.add(background)
-    background.add_done_callback(_running.discard)
+    # Runs after the 202 is sent, inside the same request. Unlike a detached
+    # asyncio task this keeps a serverless invocation (Vercel) alive until the
+    # run finishes, so the platform cannot freeze it halfway.
+    background_tasks.add_task(execute_sourcing, payload)
     return task
 
 
 async def get_status(session: AsyncSession, user: User, search_id: str) -> SourcingTask:
     search = await get_viewable_search(session, user, search_id)
-    task = await session.scalar(
-        select(SourcingTask)
-        .where(SourcingTask.search_id == search.id)
-        .order_by(SourcingTask.started_at.desc())
-        .limit(1)
-    )
+    task = await _latest_task(session, search.id)
     if task is None:
         raise ResourceNotFoundError(f"No sourcing task found for search: {search_id}")
+    if _is_orphaned(task):
+        # Checked here as well as at startup: on serverless hosts a new process
+        # (and so the startup sweep) may not come along for a long time.
+        await _fail_orphan(session, task)
+        await session.commit()
     return task
 
 
@@ -126,26 +135,48 @@ async def execute_sourcing(payload: SourcingRequestPayloadModel) -> None:
 
 async def fail_orphaned_tasks() -> int:
     """Fail runs that were still open when their worker process went away."""
-    settings = get_settings()
-    cutoff = utcnow() - timedelta(seconds=settings.sourcing_timeout_seconds + _ORPHAN_GRACE_SECONDS)
     async with session_factory()() as session:
         orphans = list(
             await session.scalars(
                 select(SourcingTask).where(
-                    SourcingTask.status.in_([TaskStatus.PENDING, TaskStatus.IN_PROGRESS]),
-                    SourcingTask.started_at < cutoff,
+                    SourcingTask.status.in_(_OPEN_STATUSES),
+                    SourcingTask.started_at < _orphan_cutoff(),
                 )
             )
         )
         for task in orphans:
-            task.status = TaskStatus.FAILED
-            task.error = "Sourcing was interrupted before it finished"
-            task.completed_at = utcnow()
-            search = await session.get(Search, task.search_id)
-            if search is not None and search.sourcing_status == SourcingStatus.IN_PROGRESS:
-                search.sourcing_status = SourcingStatus.FAILED
+            await _fail_orphan(session, task)
         await session.commit()
     return len(orphans)
+
+
+def _orphan_cutoff() -> datetime:
+    # A live run always ends (or times out) within the sourcing timeout, so an
+    # open run older than this has no process left working on it.
+    timeout = get_settings().sourcing_timeout_seconds
+    return utcnow() - timedelta(seconds=timeout + _ORPHAN_GRACE_SECONDS)
+
+
+def _is_orphaned(task: SourcingTask) -> bool:
+    return task.status in _OPEN_STATUSES and task.started_at < _orphan_cutoff()
+
+
+async def _fail_orphan(session: AsyncSession, task: SourcingTask) -> None:
+    task.status = TaskStatus.FAILED
+    task.error = "Sourcing was interrupted before it finished"
+    task.completed_at = utcnow()
+    search = await session.get(Search, task.search_id)
+    if search is not None and search.sourcing_status == SourcingStatus.IN_PROGRESS:
+        search.sourcing_status = SourcingStatus.FAILED
+
+
+async def _latest_task(session: AsyncSession, search_id: str) -> Optional[SourcingTask]:
+    return await session.scalar(
+        select(SourcingTask)
+        .where(SourcingTask.search_id == search_id)
+        .order_by(SourcingTask.started_at.desc())
+        .limit(1)
+    )
 
 
 def _validate_platforms(platforms: list[str]) -> list[str]:

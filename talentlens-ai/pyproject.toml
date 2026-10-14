@@ -26,3 +26,12 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
+
+# Vercel (see vercel.json for the build command and function limits).
+[tool.vercel]
+entrypoint = "app.main:app"
+
+# Serve the UI from the function rather than Vercel's CDN, so the UI shell
+# keeps the headers the app sets (CSP, X-Frame-Options, Cache-Control).
+[tool.vercel.fastapi.static]
+cdn = false

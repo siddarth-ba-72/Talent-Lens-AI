@@ -239,3 +239,6 @@ requirements
 specs
 
 # End of https://www.toptal.com/developers/gitignore/api/java,python,angular
+
+# Vercel CLI project link
+.vercel/

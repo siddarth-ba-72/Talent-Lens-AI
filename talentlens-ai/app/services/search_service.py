@@ -33,7 +33,8 @@ ALLOWED_CONTENT_TYPES = {
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 }
-MAX_JD_FILE_BYTES = 5 * 1024 * 1024
+# Kept under Vercel's 4.5 MB request body cap, which rejects larger uploads before they reach the app.
+MAX_JD_FILE_BYTES = 4 * 1024 * 1024
 
 _SORT_COLUMNS = {
     "createdAt": Search.created_at,
@@ -188,7 +189,7 @@ def _validate_file(jd_file: UploadFile) -> None:
     if jd_file.content_type not in ALLOWED_CONTENT_TYPES:
         raise InvalidFileError("Unsupported file type. Allowed: .txt, .pdf, .docx")
     if jd_file.size is not None and jd_file.size > MAX_JD_FILE_BYTES:
-        raise FileTooLargeError("File size exceeds the 5MB limit")
+        raise FileTooLargeError("File size exceeds the 4MB limit")
 
 
 async def _parse(settings: Settings, parsing) -> ParsedJdModel:

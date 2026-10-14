@@ -3,7 +3,7 @@ import type { Platform } from '@/types/search'
 export const POLLING_INTERVAL_MS = 3000
 export const SEARCH_PAGE_SIZE = 10
 export const CANDIDATE_PAGE_SIZE = 20
-export const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024 // 5 MB
+export const MAX_FILE_SIZE_BYTES = 4 * 1024 * 1024 // 4 MB: Vercel rejects request bodies over 4.5 MB
 export const ALLOWED_FILE_TYPES = ['.txt', '.pdf', '.docx']
 export const ALLOWED_MIME_TYPES = [
   'text/plain',

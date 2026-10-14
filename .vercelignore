@@ -1,0 +1,23 @@
+# Files never uploaded by `vercel deploy` (Git deployments only see tracked files).
+# Vercel does not read .gitignore, and its built-in list skips .env.local but not .env.
+
+# Secrets and machine-local settings.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local environments and caches; the build reinstalls dependencies.
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+
+# Rebuilt from talentlens-client by the build command.
+talentlens-ai/static
+
+# Local-only docs and editor settings.
+/specs
+/requirements
+/.claude
+/.vscode

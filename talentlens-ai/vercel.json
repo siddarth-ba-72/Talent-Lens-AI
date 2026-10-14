@@ -1,14 +1,10 @@
 {
-  "version": 2,
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index"
-    }
-  ],
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../talentlens-client && npm ci --include=dev && npm run build",
   "functions": {
-    "api/index.py": {
-      "maxDuration": 300
+    "app/main.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{tests/**,scripts/**,.pytest_cache/**,.env,.env.*}"
     }
   }
 }

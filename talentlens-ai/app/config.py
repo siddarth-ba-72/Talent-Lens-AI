@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -11,8 +12,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _SERVICE_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _default_app_env() -> str:
+    # Vercel production and preview deployments must not fall back to dev
+    # (open /docs, non-Secure cookies) just because APP_ENV was left unset.
+    return "prod" if os.getenv("VERCEL_ENV") in {"production", "preview"} else "dev"
+
+
 class Settings(BaseSettings):
-    app_env: str = Field(default="dev", alias="APP_ENV")
+    app_env: str = Field(default_factory=_default_app_env, alias="APP_ENV")
     app_port: int = Field(default=9000, alias="APP_PORT")
 
     # Datastores: Postgres holds the structured data (users, searches, sourcing

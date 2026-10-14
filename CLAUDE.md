@@ -27,9 +27,15 @@ Tables and indexes are created at startup (`create_all` / Beanie). There is no m
 UI → `POST /api/searches/jd-text|jd-file` → LLM provider (in a worker thread) → Postgres → response
 
 **Candidate sourcing (in-process background task):**
-UI → `POST /api/searches/{id}/source` → task row + `202` → `asyncio` task: LLM query generation → GitHub API → scoring → candidates into MongoDB → task/search updated in Postgres. The UI polls `GET /api/searches/{id}/source-status`.
+UI → `POST /api/searches/{id}/source` → task row + `202` → FastAPI `BackgroundTasks` job (runs after the response, inside the same request): LLM query generation → GitHub API → scoring → candidates into MongoDB → task/search updated in Postgres. The UI polls `GET /api/searches/{id}/source-status`.
 
-Because sourcing is an in-process task and login rate limits are in memory, the service must run as a long-lived process (not serverless, and state is per instance).
+### Deployment
+
+Production runs on **Vercel** as one Python function (`talentlens-ai/vercel.json`, `[tool.vercel]` in `talentlens-ai/pyproject.toml`); the root `Dockerfile` is the alternative. Constraints that follow from Vercel:
+- Keep post-response work on `BackgroundTasks`, never a detached `asyncio.create_task`: Vercel ends the invocation when the ASGI call returns and may freeze the instance, so detached work can stall halfway. It must also finish within the function's `maxDuration` (300 s).
+- Do not rely on process startup for cleanup. Stale sourcing runs are failed at startup and again when their status is polled.
+- Request bodies are capped at 4.5 MB (JD uploads are limited to 4 MB to fit). Login rate limits are in memory, so they are per instance.
+- The UI is served by the function, not the CDN (`[tool.vercel.fastapi.static] cdn = false`), so the UI shell keeps the app's security headers.
 
 ### Roles
 - `RECRUITER`: full access (create/delete searches, trigger sourcing, export candidates, resolve share requests)
@@ -80,7 +86,7 @@ All service settings are read from `talentlens-ai/.env` (see `.env.example` and 
 | `JWT_SECRET` | Required, at least 32 characters |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Redirect URI is the service's own origin + `/oauth/google/callback` and must be registered in Google Cloud Console |
 | `LLM_PROVIDER`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GITHUB_TOKEN` | LLM and sourcing credentials |
-| `APP_ENV` | `dev` enables `/docs` and non-`Secure` cookies; anything else is treated as production |
+| `APP_ENV` | `dev` enables `/docs` and non-`Secure` cookies; anything else is treated as production. Unset, it is `prod` on Vercel production/preview deployments (`VERCEL_ENV`) and `dev` elsewhere |
 
 UI build-time: `VITE_GOOGLE_CLIENT_ID` (and `VITE_API_BASE_URL` as the dev-server proxy target) in `talentlens-client/.env.local`.
 
