@@ -44,86 +44,76 @@ Any user with access to a search can export the candidate list as a CSV file. Th
 
 ```mermaid
 flowchart TB
-    subgraph Client["Frontend (Vercel)"]
-        UI["React 18 + TypeScript\nTailwind CSS + Vite"]
+    Browser["Browser\nReact UI"]
+
+    subgraph App["TalentLens service (FastAPI)"]
+        Static["Static UI\n(built React app)"]
+        Api["REST API /api\nauth, searches, sharing, export"]
+        Sourcing["Sourcing workflow\nquery generation + scoring"]
+        Parser["JD parser\nLLM provider"]
     end
 
-    subgraph Backend["Spring Boot API (Render — Docker)"]
-        Auth["JWT Auth"]
-        Search["Search CRUD"]
-        Sourcing["Sourcing Orchestrator"]
-        Share["Share Request Manager"]
-        Export["CSV Export"]
-    end
-
-    subgraph AI["Python AI Service (Vercel)"]
-        Parser["JD Parser\nGPT-4o-mini"]
-        QueryGen["Query Generator"]
-        Scorer["Candidate Scoring\nOpenAI LLM"]
-    end
-
-    subgraph DB["MongoDB Atlas"]
-        Users[(users)]
-        Searches[(searches)]
-        Candidates[(candidates)]
+    subgraph Data["Data stores"]
+        PG[("PostgreSQL\nusers, searches,\ntasks, share requests")]
+        Mongo[("MongoDB\ncandidate profiles")]
     end
 
     subgraph External["External APIs"]
+        LLM["OpenAI / Gemini"]
         GH["GitHub API"]
-        SO["Stack Overflow API"]
+        Google["Google sign-in"]
     end
 
-    UI -->|"REST + JWT"| Backend
-    Backend -->|"POST /ai/parse-jd\nsync REST"| Parser
-    Backend -->|"POST /ai/source-candidates\nsync REST"| QueryGen
-    QueryGen --> Scorer
-    Scorer -->|"scored candidates"| Backend
-    Backend <--> DB
-    QueryGen --> GH
-    QueryGen --> SO
+    Browser -->|"GET / (same origin)"| Static
+    Browser -->|"REST + JWT + session cookie"| Api
+    Api --> Parser
+    Api --> Sourcing
+    Api <--> PG
+    Api <--> Mongo
+    Sourcing --> Mongo
+    Parser --> LLM
+    Sourcing --> LLM
+    Sourcing --> GH
+    Api --> Google
 ```
 
-### Frontend — React (Vercel)
+TalentLens runs as **one service**. The FastAPI application in `talentlens-ai/` exposes the REST API, runs the LLM and sourcing work in-process, and serves the built React UI from the same origin. There is no separate frontend host and no CORS.
 
-The frontend is a single-page application built with React 18, TypeScript, Vite 5, and Tailwind CSS. It communicates with the backend exclusively via REST over HTTPS. Axios is used as the HTTP client, with JWT access tokens attached to every authenticated request via an Axios interceptor. Expired tokens are refreshed automatically using the stored refresh token before retrying the original request.
+| Directory | What it is |
+|---|---|
+| `talentlens-ai/` | The service: FastAPI app (Python 3.12). Serves the API under `/api` and the UI at `/`. |
+| `talentlens-client/` | The UI source: React 19 + TypeScript + Vite + Tailwind CSS. `npm run build` writes static files into `talentlens-ai/static/`. |
 
-State management is split between TanStack Query (server state: searches, candidates, sourcing status) and Zustand (client state: auth, UI theme). Page-level components are lazy-loaded to keep the initial bundle small.
+### Data stores
 
-The app is deployed to Vercel. Vercel's rewrite rules proxy all `/api/*` requests to the Spring Boot backend on Render, and route all other paths to `index.html` to support client-side routing.
-
-### Backend — Spring Boot (Render)
-
-The backend is a Java 21 Spring Boot 3 application, containerised with Docker and deployed on Render. It is the central coordinator of the system and the single source of truth for all persisted data.
-
-Responsibilities:
-- **Authentication** — JWT-based auth with access tokens (15-minute TTL) and refresh tokens (7-day TTL). Passwords are hashed with BCrypt.
-- **Search management** — CRUD for searches, with auto-generated titles derived from the JD domain and a timestamp.
-- **AI service integration** — calls the Python AI service synchronously (via WebClient) for JD parsing when a search is created.
-- **Sourcing orchestration** — calls the AI service synchronously to trigger candidate sourcing; receives scored candidates in the response and persists them to MongoDB.
-- **Search sharing** — manages the full share request lifecycle: hiring manager requests access, recruiter approves or rejects, persisted history on both sides.
-- **Export** — streams a CSV of candidate data directly from MongoDB, formatted and returned as a file download.
-
-The backend exposes all API routes under `/api/`. Internal routes used only by the AI service are prefixed `/ai/` and are not accessible to the frontend.
-
-### AI Service — FastAPI (Vercel)
-
-The AI service is a Python 3.12+ FastAPI application. It handles all LLM interaction and external API calls.
-
-Responsibilities:
-- **JD parsing** — called synchronously by the backend on search creation. Uses GPT-4o-mini at temperature 0.0 with a Pydantic output parser to extract skills, technologies, experience level, qualifications, domain, and a summary from the raw JD text or uploaded file.
-- **Query generation** — produces targeted search queries for GitHub and Stack Overflow from the parsed JD.
-- **Candidate sourcing** — called synchronously by the backend. Calls the GitHub API (repositories, users) and the Stack Overflow API (users by tags) to find candidate profiles matching the generated queries.
-- **Candidate scoring** — the OpenAI LLM scores each sourced candidate against the JD. The top 20 scored candidates are returned to the backend in the response.
-- **Provider abstraction** — LLM provider (Gemini or OpenAI) is selected at runtime via environment configuration, not hardcoded.
-
-### Infrastructure
-
-| Component | Technology | Hosting |
+| Store | Holds | Access |
 |---|---|---|
-| Database | MongoDB Atlas | MongoDB Atlas Free Tier |
-| Frontend | React + Vite | Vercel |
-| Backend | Spring Boot 3 | Render (Docker) |
-| AI Service | FastAPI | Vercel |
+| PostgreSQL | Structured data: `users`, `searches`, `search_shares`, `sourcing_tasks`, `share_requests` | SQLAlchemy 2 ORM (async, psycopg) |
+| MongoDB | Sourced candidate profiles (`candidates`), which vary by platform | Beanie ODM |
+
+Tables and indexes are created on startup. Deleting a search removes its tasks, shares and share requests in Postgres (foreign-key cascade) and its candidates in MongoDB.
+
+### Request flow
+
+- **JD parsing** runs inside the request that creates a search (`POST /api/searches/jd-text` or `/jd-file`). The LLM call is moved to a worker thread so the server stays responsive.
+- **Sourcing** is asynchronous. `POST /api/searches/{id}/source` records a task, returns `202`, and runs the workflow as a background task in the same process: generate queries, fetch profiles, score, store the top 20. The UI polls `GET /api/searches/{id}/source-status`. A run that exceeds the timeout, or that was interrupted by a restart, is marked `FAILED`.
+- **Re-sourcing** calls the same endpoint again. Every run keeps its own candidates (keyed by `runId`); `GET /api/searches/{id}/runs` lists them newest first. The candidate list and export take an optional `runId` and otherwise show the latest completed run.
+
+### Authentication and session security
+
+Every route except sign-in and registration requires authentication, including the internal `/ai/*` routes that call the LLM (recruiters only).
+
+A bearer token alone is not enough to call the API. Each session is bound to the browser it was issued to:
+
+1. On sign-in the server generates a random **session fingerprint** and sends it only as an `HttpOnly`, `SameSite=Strict` cookie. Page scripts cannot read it.
+2. The access and refresh tokens (JWT, HS256) carry `fgp`: an HMAC of that fingerprint, keyed with a **per-user salt** derived from the user's id and a secret stored on their row.
+3. A request is authorised only when the token is valid **and** the cookie hashes to the token's `fgp` under that user's salt.
+
+So a token copied out of `localStorage` is rejected without the cookie, and the cookie is useless without the token (which also rules out CSRF). Signing out rotates the user's salt, which revokes every token they hold on any device.
+
+Also in place: bcrypt password hashing, rate limiting on the sign-in endpoints (5 attempts per minute per address), a Content-Security-Policy on the UI shell, and `/docs` disabled outside `APP_ENV=dev`.
+
+Google sign-in uses the authorization-code flow with PKCE. The UI redirects to Google and the server exchanges the code and verifies the ID token.
 
 ---
 
@@ -131,136 +121,116 @@ Responsibilities:
 
 ### Prerequisites
 
-Make sure the following are installed before starting:
+- **Docker** for PostgreSQL and MongoDB (or your own instances of both)
+- **Python 3.12+** and [uv](https://docs.astral.sh/uv/) (or `pip`)
+- **Node.js 20.19+** and **npm**
+- An **OpenAI** or **Gemini** API key, and a **GitHub** personal access token for sourcing
 
-- **Docker and Docker Compose** — for MongoDB
-- **Java 21** — for the Spring Boot backend (use [SDKMAN](https://sdkman.io/) or [Homebrew](https://brew.sh/))
-- **Gradle** (or use the included `./gradlew` wrapper) — the backend build tool
-- **Python 3.12+** — for the AI service
-- **Node.js 20+** and **npm** — for the frontend
-- API keys and credentials:
-  - **OpenAI API key** or **Google Gemini API key** (for LLM calls in the AI service)
-  - **GitHub personal access token** (for GitHub API sourcing)
-
----
-
-### Step 1 — Start MongoDB
+### Step 1: Start the databases
 
 From the repo root:
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-This starts MongoDB on port `27017` (credentials: `root` / `root`, database: `talentlens`).
+This starts PostgreSQL on `5432` (`talentlens` / `talentlens`, database `talentlens`) and MongoDB on `27017` (`root` / `root`).
 
----
-
-### Step 2 — Start the AI Service
+### Step 2: Configure the service
 
 ```bash
 cd talentlens-ai
-python -m venv venv
-source venv/bin/activate       # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+cp .env.example .env
 ```
 
-Create a `.env` file in `talentlens-ai/` with:
+Fill in `.env`. The database defaults already match `docker-compose.yml`; replace them with your own links if you host the databases elsewhere.
 
-```
-OPENAI_API_KEY=your_openai_key          # or GEMINI_API_KEY for Gemini
-LLM_PROVIDER=openai                     # or gemini
-GITHUB_TOKEN=your_github_token
-MONGODB_URI=mongodb://root:root@localhost:27017/talentlens?authSource=admin
-```
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL link, e.g. `postgresql://user:pass@host:5432/db` (`?sslmode=require` is supported) |
+| `MONGODB_URI`, `MONGODB_DATABASE` | MongoDB link and database name |
+| `JWT_SECRET` | Token signing secret, at least 32 characters |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` | Google sign-in (optional) |
+| `LLM_PROVIDER`, `OPENAI_API_KEY` / `GEMINI_API_KEY`, `GITHUB_TOKEN` | LLM and sourcing credentials |
 
-Then start the service:
-
-```bash
-uvicorn app.main:app --reload --port 8000
-```
-
-The AI service will be available at `http://localhost:8000`.
-
----
-
-### Step 3 — Start the Backend
-
-```bash
-cd talentlens-backend
-```
-
-Create `src/main/resources/application-dev.yml` (or set environment variables) with:
-
-```
-MONGODB_URI=mongodb://root:root@localhost:27017/talentlens?authSource=admin
-AI_SERVICE_URL=http://localhost:8000
-JWT_SECRET=a-long-random-secret-string-at-least-32-characters
-CORS_ALLOWED_ORIGINS=http://localhost:3000
-```
-
-Then start the backend:
-
-```bash
-./gradlew bootRun
-```
-
-The backend will be available at `http://localhost:8080`.
-
----
-
-### Step 4 — Start the Frontend
+### Step 3: Build the UI
 
 ```bash
 cd talentlens-client
 npm install
+npm run build        # writes to ../talentlens-ai/static
 ```
 
-Create a `.env.local` file in `talentlens-client/` with:
+For Google sign-in, set `VITE_GOOGLE_CLIENT_ID` in `talentlens-client/.env.local` before building.
 
-```
-VITE_API_BASE_URL=http://localhost:8080
-```
+### Step 4: Run the service
 
-Then start the dev server:
-
-```bash
-npm run dev
-```
-
-The frontend will be available at `http://localhost:3000`.
-
----
-
-### Service Summary
-
-| Service | URL | Notes |
-|---|---|---|
-| Frontend | `http://localhost:3000` | Vite dev server |
-| Backend | `http://localhost:8080` | Spring Boot |
-| AI Service | `http://localhost:8000` | FastAPI with `--reload` |
-| MongoDB | `localhost:27017` | Via Docker |
-
----
-
-### Running Tests
-
-**Backend:**
-```bash
-cd talentlens-backend
-./gradlew test          # unit tests
-./gradlew verify        # full test suite including integration tests
-```
-
-**AI Service:**
 ```bash
 cd talentlens-ai
-source venv/bin/activate
-pytest
+uv sync
+uv run uvicorn app.main:app --port 9000
 ```
 
-**Frontend:**
+Open **http://localhost:9000**. The same server answers the UI, the API (`/api`), and the interactive API docs (`/docs`, dev only).
+
+### Google sign-in redirect URI
+
+Because the service now serves the UI, the OAuth redirect lands on the service's own origin. In Google Cloud Console, under the OAuth client's **Authorized redirect URIs**, add:
+
+- `http://localhost:9000/oauth/google/callback` for local use
+- `https://<your-domain>/oauth/google/callback` for each deployed environment
+
+and add the matching origins under **Authorized JavaScript origins**. `GOOGLE_REDIRECT_URI` must equal the registered value exactly.
+
+### Working on the UI
+
+For hot reload, run the Vite dev server next to the service. It proxies `/api` to `http://localhost:9000`:
+
 ```bash
 cd talentlens-client
-npm test
+npm run dev          # http://localhost:5173
+```
+
+Google sign-in from the dev server needs `http://localhost:5173/oauth/google/callback` registered as well, with `GOOGLE_REDIRECT_URI` pointing at it.
+
+---
+
+## Deployment
+
+The root `Dockerfile` builds the UI and packages it with the service into one image:
+
+```bash
+docker build --build-arg VITE_GOOGLE_CLIENT_ID=<client id> -t talentlens .
+docker run -p 9000:9000 --env-file talentlens-ai/.env -e APP_ENV=prod talentlens
+```
+
+With `APP_ENV=prod` the session cookie is `Secure` (HTTPS only) and `/docs` is off. Run it as a long-lived process: sourcing runs as an in-process background task and login rate limits are kept in memory, so serverless platforms that freeze the process between requests are not a fit.
+
+---
+
+## Migrating Data From the Old Backend
+
+Data created by the earlier Spring Boot backend lives only in MongoDB (`users`, `searches`, `sourcing_tasks`, `share_requests`, `candidates`). `scripts/migrate_legacy_mongo.py` moves the first four into PostgreSQL and re-keys the candidates to the new search ids.
+
+```bash
+cd talentlens-ai
+uv run python -m scripts.migrate_legacy_mongo            # dry run: reports what would happen, writes nothing
+uv run python -m scripts.migrate_legacy_mongo --apply    # performs the migration
+```
+
+It writes to the stores configured in `.env` (`DATABASE_URL`, `MONGODB_URI`). By default it reads the legacy collections from that same MongoDB database and re-keys the candidates in place. If the old data is somewhere else, set `LEGACY_MONGODB_URI` and `LEGACY_MONGODB_DATABASE`, and the candidates are copied instead.
+
+The script can be re-run safely and never deletes anything. Passwords keep working; everyone signs in again. Records it cannot place (for example a search whose owner no longer exists) are listed in the report and left where they are.
+
+---
+
+## Running Tests
+
+```bash
+cd talentlens-ai
+uv run pytest
+
+cd talentlens-client
+npm run lint
+npm run build        # includes the TypeScript check
 ```

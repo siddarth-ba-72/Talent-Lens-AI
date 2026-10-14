@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, Trash2, MapPin, Mail, GitBranch, Hash } from 'lucide-react'
+import { ExternalLink, Trash2, MapPin, Mail, GitBranch, Hash, GraduationCap } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,7 @@ export function CandidateCard({ candidate, canDelete = false }: CandidateCardPro
 
   return (
     <>
-      <Card className="group hover:shadow-md transition-all duration-200 hover:border-primary/20">
+      <Card className="group transition-all duration-200 hover:border-primary/25 hover:shadow-lg hover:shadow-primary/5">
         <CardContent className="p-5">
           <div className="flex items-start gap-4">
             {/* Avatar + score */}
@@ -134,8 +134,9 @@ export function CandidateCard({ candidate, canDelete = false }: CandidateCardPro
 
               {/* Education */}
               {candidate.education?.length > 0 && (
-                <p className="mt-1.5 text-xs text-muted-foreground">
-                  🎓 {candidate.education[0].degree}{candidate.education[0].institution && `, ${candidate.education[0].institution}`}
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+                  {candidate.education[0].degree}{candidate.education[0].institution && `, ${candidate.education[0].institution}`}
                 </p>
               )}
             </div>

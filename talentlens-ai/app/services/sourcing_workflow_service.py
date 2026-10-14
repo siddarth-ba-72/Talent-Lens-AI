@@ -188,11 +188,12 @@ class SourcingWorkflowService:
         }
 
     async def run(self, payload: SourcingRequestPayloadModel) -> SourcingResultPayloadModel:
-        completed_at = datetime.now(timezone.utc)
-
         # Use the LLM to generate platform-specific search queries
         platforms_str = [p.value for p in payload.platforms]
-        queries_by_platform = self._provider.generate_queries(payload.parsedJd, platforms_str)
+        # The provider call blocks; keep it off the event loop.
+        queries_by_platform = await asyncio.to_thread(
+            self._provider.generate_queries, payload.parsedJd, platforms_str
+        )
 
         raw_candidates, errors = await self._source_candidates(queries_by_platform, payload.platforms)
         ranked = self._score_and_rank(raw_candidates, payload)
@@ -209,7 +210,7 @@ class SourcingWorkflowService:
             status=status,
             candidates=ranked,
             error=error_message,
-            completedAt=completed_at,
+            completedAt=datetime.now(timezone.utc),
         )
 
     async def _source_candidates(

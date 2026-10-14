@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import UploadFile
 
 from app.models.jd_models import ParsedJdModel
@@ -17,7 +19,8 @@ class JdParserService:
 
     async def parse_jd_file(self, file: UploadFile) -> ParsedJdModel:
         text = await extract_text_from_upload(file)
-        return self.parse_jd_text(text)
+        # The provider call blocks; keep it off the event loop.
+        return await asyncio.to_thread(self.parse_jd_text, text)
 
     def generate_queries(self, parsed_jd: ParsedJdModel, platforms: list[str]) -> dict[str, list[str]]:
         return self._provider.generate_queries(parsed_jd, platforms)

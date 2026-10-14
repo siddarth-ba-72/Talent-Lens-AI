@@ -8,7 +8,7 @@ export default {
   theme: {
     container: {
       center: true,
-      padding: '2rem',
+      padding: { DEFAULT: '1rem', sm: '2rem' },
       screens: { '2xl': '1400px' },
     },
     extend: {
@@ -53,7 +53,8 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Geist', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       keyframes: {
         'accordion-down': {
@@ -72,12 +73,33 @@ export default {
           '0%': { backgroundPosition: '-200% 0' },
           '100%': { backgroundPosition: '200% 0' },
         },
+        'fade-up': {
+          from: { opacity: '0', transform: 'translateY(12px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        pop: {
+          '0%': { opacity: '0', transform: 'scale(0.85)' },
+          '60%': { opacity: '1', transform: 'scale(1.06)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-8px)' },
+        },
+        'progress-fill': {
+          from: { width: '0%' },
+          to: { width: '100%' },
+        },
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
         'accordion-up': 'accordion-up 0.2s ease-out',
         'fade-in': 'fade-in 0.3s ease-out',
         shimmer: 'shimmer 1.5s infinite linear',
+        'fade-up': 'fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both',
+        pop: 'pop 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both',
+        float: 'float 6s ease-in-out infinite',
+        'progress-fill': 'progress-fill 1.6s cubic-bezier(0.4, 0, 0.2, 1) forwards',
       },
     },
   },

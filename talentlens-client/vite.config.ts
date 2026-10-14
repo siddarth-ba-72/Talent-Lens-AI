@@ -14,12 +14,15 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://localhost:8080',
+          target: env.VITE_API_BASE_URL || 'http://localhost:9000',
           changeOrigin: true,
         },
       },
     },
     build: {
+      // The FastAPI backend serves the UI from this directory.
+      outDir: path.resolve(__dirname, '../talentlens-ai/static'),
+      emptyOutDir: true,
       rollupOptions: {
         output: {
           manualChunks(id) {

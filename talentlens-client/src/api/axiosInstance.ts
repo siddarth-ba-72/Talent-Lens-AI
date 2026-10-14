@@ -27,8 +27,11 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
+    // A 401 from these means bad credentials, not an expired session: refreshing
+    // cannot help, and retrying /auth/refresh from here would wait on itself forever.
+    const isCredentialCall = /^\/auth\/(login|register|refresh|google\/)/.test(original?.url ?? '')
 
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && !original._retry && !isCredentialCall) {
       if (isRefreshing) {
         return new Promise((resolve) => {
           refreshQueue.push((token: string) => {

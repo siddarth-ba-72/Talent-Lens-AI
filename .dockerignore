@@ -1,0 +1,14 @@
+.git
+**/node_modules
+**/.venv
+**/venv
+**/__pycache__
+**/.pytest_cache
+
+# Secrets and machine-local settings never go into the image.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Rebuilt inside the image.
+talentlens-ai/static
