@@ -37,6 +37,8 @@ export interface Candidate {
 }
 
 export interface CandidateFilters {
+  // Sourcing run to show; unset means the latest completed run.
+  runId?: string
   skill?: string
   source?: CandidateSource | 'ALL'
   minScore?: number

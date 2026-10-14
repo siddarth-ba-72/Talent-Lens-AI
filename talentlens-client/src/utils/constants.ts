@@ -1,3 +1,5 @@
+import type { Platform } from '@/types/search'
+
 export const POLLING_INTERVAL_MS = 3000
 export const SEARCH_PAGE_SIZE = 10
 export const CANDIDATE_PAGE_SIZE = 20
@@ -9,6 +11,7 @@ export const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
 export const MIN_JD_LENGTH = 100
+export const DEFAULT_PLATFORMS: Platform[] = ['GITHUB', 'STACKOVERFLOW']
 export const TOAST_DURATION_MS = 4000
 
 export const STORAGE_KEYS = {
@@ -34,6 +37,7 @@ export const QUERY_KEYS = {
   SEARCH: 'search',
   CANDIDATES: 'candidates',
   SOURCING_STATUS: 'sourcingStatus',
+  SOURCING_RUNS: 'sourcingRuns',
   SHARE_REQUESTS: 'shareRequests',
   RECRUITERS: 'recruiters',
   ME: 'me',

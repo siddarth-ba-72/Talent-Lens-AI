@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends
 
 from app.dependencies import get_sourcing_workflow_service
 from app.models.candidate_models import SourcingRequestPayloadModel, SourcingResultPayloadModel
+from app.security.auth import require_recruiter
 from app.services.sourcing_workflow_service import SourcingWorkflowService
 
 
-router = APIRouter(prefix="/ai", tags=["sourcing"])
+router = APIRouter(prefix="/ai", tags=["sourcing"], dependencies=[Depends(require_recruiter)])
 
 
 @router.post("/source-candidates", response_model=SourcingResultPayloadModel)

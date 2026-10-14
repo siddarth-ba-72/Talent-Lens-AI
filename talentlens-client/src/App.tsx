@@ -11,6 +11,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
 
+const LandingPage = lazy(() => import('@/pages/LandingPage'))
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const RegisterPage = lazy(() => import('@/pages/RegisterPage'))
 const OAuthCallbackPage = lazy(() => import('@/pages/OAuthCallbackPage'))
@@ -28,11 +29,21 @@ const queryClient = new QueryClient({
   },
 })
 
+// Cached API responses belong to the account that fetched them. Drop them whenever the
+// signed-in user changes, or the next account in this tab is shown the previous one's data.
+useAuthStore.subscribe((state, prev) => {
+  if (state.user?.id !== prev.user?.id) queryClient.clear()
+})
+
 function AppLayout() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="relative min-h-screen bg-background">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 -z-0 h-[420px] bg-[radial-gradient(ellipse_70%_60%_at_50%_-10%,hsl(var(--primary)/0.10),transparent_70%)]"
+        aria-hidden="true"
+      />
       <Navbar />
-      <main>
+      <main className="relative">
         <ErrorBoundary>
           <Suspense fallback={
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -59,6 +70,7 @@ function AppRoutes() {
       {/* Outer Suspense handles auth/public pages; inner Suspense (in AppLayout) handles protected pages */}
       <Routes>
         <Route element={<PublicRoute />}>
+          <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/oauth/google/callback" element={<OAuthCallbackPage />} />
@@ -75,8 +87,8 @@ function AppRoutes() {
           </Route>
         </Route>
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Signed-in users reaching "/" are sent on to the dashboard by PublicRoute. */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>
   )

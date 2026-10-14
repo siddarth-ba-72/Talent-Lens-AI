@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { PageLoader } from '@/components/common/LoadingSpinner'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { AuthLayout } from '@/components/auth/AuthLayout'
 import { RoleSelectionForm } from '@/components/auth/RoleSelectionForm'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
@@ -114,30 +114,20 @@ export default function OAuthCallbackPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-destructive/5 p-4">
-        <div className="w-full max-w-md animate-fade-in">
-          <Card className="shadow-xl border-destructive/30">
-            <CardHeader>
-              <CardTitle className="text-xl text-destructive">{error.title}</CardTitle>
-              <CardDescription>{error.detail}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                className="w-full"
-                onClick={() => {
-                  callbackInFlight = false
-                  navigate('/login', { replace: true })
-                }}
-              >
-                Back to login
-              </Button>
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                Details logged to the browser console for debugging.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <AuthLayout title={error.title} description={error.detail}>
+        <Button
+          className="w-full"
+          onClick={() => {
+            callbackInFlight = false
+            navigate('/login', { replace: true })
+          }}
+        >
+          Back to sign in
+        </Button>
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Details logged to the browser console for debugging.
+        </p>
+      </AuthLayout>
     )
   }
 

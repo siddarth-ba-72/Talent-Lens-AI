@@ -2,16 +2,16 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
-import { BriefcaseIcon, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
+import { AuthLayout } from './AuthLayout'
 import { GoogleSignInButton } from './GoogleSignInButton'
+import { RolePicker } from './RolePicker'
 import type { AxiosError } from 'axios'
 import type { ApiError } from '@/types/common'
 
@@ -20,7 +20,7 @@ const schema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   confirmPassword: z.string(),
-  role: z.enum(['RECRUITER', 'HIRING_MANAGER']),
+  role: z.enum(['RECRUITER', 'HIRING_MANAGER'], { error: 'Choose how you will use TalentLens' }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -45,8 +45,8 @@ export function RegisterForm() {
     setServerError(null)
     try {
       await registerUser({ name: data.name, email: data.email, password: data.password, role: data.role })
-      addToast({ type: 'success', title: 'Account created!', description: 'Please sign in to continue.' })
-      navigate('/login')
+      addToast({ type: 'success', title: 'Account created!', description: `Welcome, ${data.name}!` })
+      navigate('/dashboard')
     } catch (err) {
       const e = err as AxiosError<ApiError>
       const msg = e.response?.data?.message ?? 'Registration failed. Please try again.'
@@ -55,116 +55,93 @@ export function RegisterForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <div className="w-full max-w-md animate-fade-in">
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg shadow-primary/25">
-            <BriefcaseIcon className="h-6 w-6 text-primary-foreground" />
-          </div>
-          <h1 className="text-2xl font-bold gradient-heading">TalentLens</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Create your account</p>
+    <AuthLayout title="Create your account" description="Start sourcing from your first job description in minutes.">
+      <GoogleSignInButton label="Sign up with Google" />
+
+      <div className="relative my-6">
+        <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+        <div className="relative flex justify-center text-xs">
+          <span className="bg-background px-3 text-muted-foreground">or sign up with email</span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-2">
+          <Label>I am a</Label>
+          <RolePicker
+            value={role}
+            onChange={(val) => setValue('role', val, { shouldValidate: true })}
+          />
+          {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
         </div>
 
-        <Card className="shadow-xl border-border/50">
-          <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl">Get started</CardTitle>
-            <CardDescription>Create a free account to start sourcing candidates</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full name</Label>
-                <Input id="name" placeholder="Jane Smith" autoComplete="name" {...register('name')} />
-                {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-              </div>
+        <div className="space-y-2">
+          <Label htmlFor="name">Full name</Label>
+          <Input id="name" placeholder="Jane Smith" autoComplete="name" {...register('name')} />
+          {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+        </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" placeholder="you@company.com" autoComplete="email" {...register('email')} />
-                {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
-              </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Work email</Label>
+          <Input id="email" type="email" placeholder="you@company.com" autoComplete="email" {...register('email')} />
+          {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+        </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="reg-password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="reg-password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Min. 8 characters"
-                    autoComplete="new-password"
-                    className="pr-10"
-                    {...register('password')}
-                  />
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setShowPassword(!showPassword)}
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </button>
-                </div>
-                {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm password</Label>
-                <Input
-                  id="confirmPassword"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Repeat your password"
-                  autoComplete="new-password"
-                  {...register('confirmPassword')}
-                />
-                {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <Label>I am a</Label>
-                <Select
-                  value={role}
-                  onValueChange={(val) => setValue('role', val as 'RECRUITER' | 'HIRING_MANAGER', { shouldValidate: true })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select your role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="RECRUITER">Recruiter</SelectItem>
-                    <SelectItem value="HIRING_MANAGER">Hiring Manager</SelectItem>
-                  </SelectContent>
-                </Select>
-                {errors.role && <p className="text-xs text-destructive">{errors.role.message}</p>}
-              </div>
-
-              {serverError && (
-                <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
-                  {serverError}
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" loading={isSubmitting}>
-                Create account
-              </Button>
-            </form>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">or</span>
-              </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="reg-password">Password</Label>
+            <div className="relative">
+              <Input
+                id="reg-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Min. 8 characters"
+                autoComplete="new-password"
+                className="pr-10"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
+            {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+          </div>
 
-            <GoogleSignInButton label="Sign up with Google" />
+          <div className="space-y-2">
+            <Label htmlFor="confirmPassword">Confirm</Label>
+            <Input
+              id="confirmPassword"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Repeat it"
+              autoComplete="new-password"
+              {...register('confirmPassword')}
+            />
+            {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>}
+          </div>
+        </div>
 
-            <div className="mt-4 text-center text-sm text-muted-foreground">
-              Already have an account?{' '}
-              <Link to="/login" className="font-medium text-primary hover:underline">
-                Sign in
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+        {serverError && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive animate-fade-in">
+            {serverError}
+          </div>
+        )}
+
+        <Button type="submit" className="w-full" loading={isSubmitting}>
+          Create account
+        </Button>
+      </form>
+
+      <p className="mt-8 text-center text-sm text-muted-foreground">
+        Already have an account?{' '}
+        <Link to="/login" className="font-medium text-primary hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </AuthLayout>
   )
 }

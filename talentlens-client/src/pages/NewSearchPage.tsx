@@ -12,7 +12,7 @@ import { PlatformSelector } from '@/components/search/PlatformSelector'
 import { createSearch, triggerSourcing } from '@/api/searchApi'
 import { useUiStore } from '@/stores/uiStore'
 import type { Search as SearchType, Platform } from '@/types/search'
-import { MIN_JD_LENGTH } from '@/utils/constants'
+import { DEFAULT_PLATFORMS, MIN_JD_LENGTH } from '@/utils/constants'
 import { cn } from '@/lib/utils'
 
 type InputMode = 'text' | 'file'
@@ -24,7 +24,7 @@ export default function NewSearchPage() {
   const [inputMode, setInputMode] = useState<InputMode>('text')
   const [jdText, setJdText] = useState('')
   const [jdFile, setJdFile] = useState<File | null>(null)
-  const [platforms, setPlatforms] = useState<Platform[]>(['GITHUB', 'STACKOVERFLOW'])
+  const [platforms, setPlatforms] = useState<Platform[]>(DEFAULT_PLATFORMS)
   const [createdSearch, setCreatedSearch] = useState<SearchType | null>(null)
   const [validationError, setValidationError] = useState<string | null>(null)
   const [platformError, setPlatformError] = useState<string | null>(null)
@@ -97,7 +97,7 @@ export default function NewSearchPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">New Search</h1>
+          <h1 className="text-2xl font-semibold">New Search</h1>
           <p className="text-muted-foreground">Provide a job description to find matching candidates</p>
         </div>
       </div>

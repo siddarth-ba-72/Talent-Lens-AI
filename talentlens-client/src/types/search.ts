@@ -34,12 +34,16 @@ export interface SourcingRequest {
   platforms: Platform[]
 }
 
+// One sourcing run of a search (the API calls it a task). Each run keeps its own candidates.
 export interface SourcingStatusResponse {
   taskId: string
+  searchId: string
+  runId: string
   status: SourcingTaskStatus
-  startedAt: string | null
+  candidatesFound: number
+  error: string | null
+  startedAt: string
   completedAt: string | null
-  message?: string
 }
 
 export interface SearchFilters {

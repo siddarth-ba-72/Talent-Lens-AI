@@ -19,14 +19,14 @@ export default function ShareRequestsPage() {
 
   const isRecruiter = user?.role === 'RECRUITER'
 
-  const { data: incoming, isLoading: incomingLoading } = useShareRequests('incoming')
+  const { data: incoming, isLoading: incomingLoading } = useShareRequests('incoming', isRecruiter)
   const { data: outgoing, isLoading: outgoingLoading } = useShareRequests('outgoing', !isRecruiter)
 
   return (
     <div className="container mx-auto py-8 space-y-6 max-w-2xl">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Share Requests</h1>
+          <h1 className="text-2xl font-semibold">Share Requests</h1>
           <p className="text-muted-foreground">
             {isRecruiter ? 'Manage requests from hiring managers' : 'Request and track access to searches'}
           </p>
@@ -91,9 +91,14 @@ function OutgoingRequestCard({ request }: { request: ShareRequest }) {
         <div>
           <p className="text-sm font-medium">
             Access to{' '}
-            <Link to={`/searches/${request.searchId}`} className="text-primary hover:underline">
-              {request.searchTitle}
-            </Link>
+            {request.status === 'APPROVED' ? (
+              <Link to={`/searches/${request.searchId}`} className="text-primary hover:underline">
+                {request.searchTitle}
+              </Link>
+            ) : (
+              // Not openable until the recruiter approves, so it is not offered as a link.
+              <span>{request.searchTitle}</span>
+            )}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">
             From <span className="font-medium">{request.ownerName}</span> · {formatRelativeTime(request.requestedAt)}

@@ -1,4 +1,14 @@
 services:
+  postgres:
+    image: postgres:16
+    container_name: talentlens-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: talentlens
+      POSTGRES_PASSWORD: talentlens
+      POSTGRES_DB: talentlens
+
   mongo:
     image: mongo:7.0
     container_name: talentlens-mongo

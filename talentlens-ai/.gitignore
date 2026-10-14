@@ -12,5 +12,8 @@ __pycache__/
 dist/
 build/
 
+# Built UI (output of `npm run build` in talentlens-client)
+static/
+
 # macOS
 .DS_Store

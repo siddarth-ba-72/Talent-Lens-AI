@@ -39,6 +39,24 @@ class RankedCandidateModel(BaseModel):
     sourcedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class CandidateResponse(BaseModel):
+    id: str
+    searchId: str
+    runId: str
+    name: str
+    email: Optional[str]
+    avatarUrl: Optional[str]
+    profileUrl: str
+    source: str
+    sourceUsername: str
+    skills: list[str]
+    bio: Optional[str]
+    location: Optional[str]
+    matchScore: int
+    scoreBreakdown: ScoreBreakdownModel
+    sourcedAt: datetime
+
+
 class SourcingRequestPayloadModel(BaseModel):
     taskId: str
     searchId: str

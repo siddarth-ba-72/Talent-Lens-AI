@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { ParsedJdSummary } from '@/components/search/ParsedJdSummary'
 import { SourcingStatus } from '@/components/search/SourcingStatus'
+import { SourcingRunSelect } from '@/components/search/SourcingRunSelect'
 import { CandidateCard } from '@/components/candidate/CandidateCard'
 import { CandidateFiltersBar } from '@/components/candidate/CandidateFilters'
 import { ExportButton } from '@/components/candidate/ExportButton'
@@ -16,9 +17,11 @@ import { RoleGuard } from '@/components/layout/RoleGuard'
 import { useSearch } from '@/hooks/useSearch'
 import { useCandidates } from '@/hooks/useCandidates'
 import { useSourcingStatus } from '@/hooks/useSourcingStatus'
+import { useSourcingRuns } from '@/hooks/useSourcingRuns'
 import { deleteSearch, triggerSourcing } from '@/api/searchApi'
+import { useAuthStore } from '@/stores/authStore'
 import { useUiStore } from '@/stores/uiStore'
-import { QUERY_KEYS, CANDIDATE_PAGE_SIZE } from '@/utils/constants'
+import { QUERY_KEYS, CANDIDATE_PAGE_SIZE, DEFAULT_PLATFORMS } from '@/utils/constants'
 import { pluralize } from '@/utils/formatters'
 import type { CandidateFilters } from '@/types/candidate'
 import { cn } from '@/lib/utils'
@@ -35,6 +38,7 @@ export default function SearchDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { addToast } = useUiStore()
+  const isRecruiter = useAuthStore((s) => s.user?.role === 'RECRUITER')
 
   const [jdCollapsed, setJdCollapsed] = useState(true)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -42,7 +46,12 @@ export default function SearchDetailPage() {
 
   const { data: search, isLoading: searchLoading } = useSearch(id!)
   const { data: sourcingStatus } = useSourcingStatus(id!, true)
+  const { data: runs } = useSourcingRuns(id!)
   const { data: candidatesPage, isLoading: candidatesLoading } = useCandidates(id!, candidateFilters)
+
+  const completedRuns = runs?.filter((run) => run.status === 'COMPLETED') ?? []
+  const isSourcing = sourcingStatus?.status === 'PENDING' || sourcingStatus?.status === 'IN_PROGRESS'
+  const hasFilters = !!(candidateFilters.skill || (candidateFilters.source && candidateFilters.source !== 'ALL') || candidateFilters.minScore)
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteSearch(id!),
@@ -54,13 +63,21 @@ export default function SearchDetailPage() {
     onError: () => addToast({ type: 'error', title: 'Failed to delete search' }),
   })
 
-  const retryMutation = useMutation({
-    mutationFn: () => triggerSourcing(id!, { platforms: search?.platforms ?? [] }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SOURCING_STATUS, id] })
-      addToast({ type: 'success', title: 'Sourcing restarted' })
+  // Starts a new run on the same platforms. Earlier runs keep their candidates and stay selectable.
+  const resourceMutation = useMutation({
+    mutationFn: () =>
+      triggerSourcing(id!, { platforms: search?.platforms.length ? search.platforms : DEFAULT_PLATFORMS }),
+    onSuccess: (task) => {
+      // Seeding the status starts its polling straight away.
+      queryClient.setQueryData([QUERY_KEYS.SOURCING_STATUS, id], task)
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SOURCING_RUNS, id] })
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SEARCH, id] })
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.SEARCHES] })
+      // Follow the latest run, so the new one is shown once it completes.
+      setCandidateFilters((prev) => ({ ...prev, runId: undefined, page: 0 }))
+      addToast({ type: 'success', title: 'Sourcing started', description: 'New candidates will appear when the run finishes.' })
     },
-    onError: () => addToast({ type: 'error', title: 'Failed to restart sourcing' }),
+    onError: () => addToast({ type: 'error', title: 'Failed to start sourcing' }),
   })
 
   const handleFilterChange = (changes: Partial<CandidateFilters>) => {
@@ -89,7 +106,7 @@ export default function SearchDetailPage() {
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight truncate">{search.title}</h1>
+            <h1 className="text-2xl font-semibold truncate">{search.title}</h1>
           </div>
           {search.parsedJd?.domain && (
             <p className="text-muted-foreground">{search.parsedJd.domain}</p>
@@ -98,6 +115,16 @@ export default function SearchDetailPage() {
 
         <div className="flex items-center gap-2 shrink-0">
           <RoleGuard role="RECRUITER">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => resourceMutation.mutate()}
+              disabled={isSourcing}
+              loading={resourceMutation.isPending}
+            >
+              {!resourceMutation.isPending && <RefreshCw className={cn('h-4 w-4', isSourcing && 'animate-spin')} />}
+              {isSourcing ? 'Sourcing…' : 'Re-source'}
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <Link to="/share-requests">
                 <Share2 className="h-4 w-4" /> Share
@@ -119,7 +146,7 @@ export default function SearchDetailPage() {
       {sourcingStatus && sourcingStatus.status !== 'COMPLETED' && sourcingStatus.status !== 'IDLE' && (
         <SourcingStatus
           status={sourcingStatus.status}
-          onRetry={sourcingStatus.status === 'FAILED' ? retryMutation.mutate : undefined}
+          onRetry={isRecruiter && sourcingStatus.status === 'FAILED' ? () => resourceMutation.mutate() : undefined}
         />
       )}
 
@@ -144,11 +171,18 @@ export default function SearchDetailPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Search className="h-4 w-4 text-muted-foreground" />
-            {pluralize(search.candidateCount, 'Candidate')}
+            {pluralize(candidatesPage?.totalElements ?? search.candidateCount, 'Candidate')}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {completedRuns.length > 0 && (
+              <SourcingRunSelect
+                runs={completedRuns}
+                value={candidateFilters.runId}
+                onChange={(runId) => handleFilterChange({ runId, page: 0 })}
+              />
+            )}
             <RoleGuard role="RECRUITER">
-              <ExportButton searchId={id!} />
+              <ExportButton searchId={id!} filters={candidateFilters} />
             </RoleGuard>
           </div>
         </div>
@@ -156,7 +190,7 @@ export default function SearchDetailPage() {
         <CandidateFiltersBar
           filters={candidateFilters}
           onChange={handleFilterChange}
-          onReset={() => setCandidateFilters(DEFAULT_FILTERS)}
+          onReset={() => setCandidateFilters({ ...DEFAULT_FILTERS, runId: candidateFilters.runId })}
         />
 
         {candidatesLoading ? (
@@ -169,10 +203,22 @@ export default function SearchDetailPage() {
               <RefreshCw className="h-8 w-8 text-muted-foreground/50 mb-3" />
               <p className="font-medium">No candidates found</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {search.candidateCount === 0
-                  ? 'Sourcing hasn\'t completed yet, or no candidates matched this JD.'
-                  : 'Try adjusting your filters.'}
+                {hasFilters
+                  ? 'Try adjusting your filters.'
+                  : isSourcing
+                    ? 'Sourcing is in progress. Candidates will appear here when it finishes.'
+                    : completedRuns.length === 0
+                      ? 'No sourcing run has completed for this JD yet.'
+                      : 'No candidates matched this JD in this run.'}
               </p>
+              {!hasFilters && !isSourcing && (
+                <RoleGuard role="RECRUITER">
+                  <Button size="sm" className="mt-4" onClick={() => resourceMutation.mutate()} loading={resourceMutation.isPending}>
+                    {!resourceMutation.isPending && <RefreshCw className="h-4 w-4" />}
+                    Re-source candidates
+                  </Button>
+                </RoleGuard>
+              )}
             </CardContent>
           </Card>
         ) : (

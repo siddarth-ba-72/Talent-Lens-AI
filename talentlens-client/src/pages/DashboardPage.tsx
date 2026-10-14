@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, Share2 } from 'lucide-react'
+import { FileText, Plus, Radar, Search, Share2, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SearchCard, SearchCardSkeleton } from '@/components/search/SearchCard'
 import { SearchFiltersBar } from '@/components/search/SearchFilters'
@@ -31,16 +31,23 @@ export default function DashboardPage() {
   const handleReset = () => setFilters(DEFAULT_FILTERS)
 
   const isRecruiter = user?.role === 'RECRUITER'
+  const firstName = user?.name?.split(' ')[0]
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <div className="container mx-auto space-y-6 px-4 py-10 sm:px-8">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {isRecruiter ? 'My Searches' : 'Shared Searches'}
+          {firstName && <p className="mb-1 text-sm font-medium text-primary">Welcome back, {firstName}</p>}
+          <h1 className="flex items-center gap-3 text-3xl font-semibold">
+            {isRecruiter ? 'My searches' : 'Shared searches'}
+            {!!data?.totalElements && (
+              <span className="rounded-full border bg-card px-2.5 py-0.5 text-sm font-medium text-muted-foreground">
+                {data.totalElements}
+              </span>
+            )}
           </h1>
-          <p className="text-muted-foreground">
+          <p className="mt-1 text-muted-foreground">
             {isRecruiter
               ? 'Manage your candidate sourcing jobs'
               : 'Searches shared with you by recruiters'}
@@ -49,10 +56,10 @@ export default function DashboardPage() {
 
         <div className="flex items-center gap-2">
           <RoleGuard role="RECRUITER">
-            <Button asChild>
+            <Button asChild className="shadow-lg shadow-primary/20">
               <Link to="/searches/new">
                 <Plus className="h-4 w-4" />
-                New Search
+                New search
               </Link>
             </Button>
           </RoleGuard>
@@ -118,35 +125,62 @@ export default function DashboardPage() {
 function EmptyState({ isRecruiter, hasFilters }: { isRecruiter: boolean; hasFilters: boolean }) {
   if (hasFilters) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
-        <Search className="h-10 w-10 text-muted-foreground/50 mb-4" />
-        <h3 className="font-semibold text-lg mb-1">No results found</h3>
-        <p className="text-muted-foreground text-sm">Try adjusting your search or clearing the filters.</p>
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-16 text-center">
+        <Search className="mb-4 h-10 w-10 text-muted-foreground/50" />
+        <h3 className="mb-1 text-lg font-semibold">No results found</h3>
+        <p className="text-sm text-muted-foreground">Try adjusting your search or clearing the filters.</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-        <Search className="h-8 w-8 text-primary" />
+    <div className="relative overflow-hidden rounded-2xl border border-dashed bg-card/50 px-6 py-16 text-center">
+      <div className="pointer-events-none absolute inset-0 bg-dot-grid opacity-60" aria-hidden="true" />
+      <div className="relative">
+        <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-solid text-white shadow-lg shadow-primary/25">
+          <Search className="h-7 w-7" />
+        </div>
+        <h3 className="mb-2 text-xl font-semibold">
+          {isRecruiter ? 'Start your first search' : 'No shared searches yet'}
+        </h3>
+        <p className="mx-auto mb-8 max-w-sm text-sm text-muted-foreground">
+          {isRecruiter
+            ? 'Upload a job description and TalentLens will find and rank matching candidates from GitHub and Stack Overflow.'
+            : 'A recruiter needs to share a search with you before it appears here. You can ask one for access.'}
+        </p>
+
+        {isRecruiter ? (
+          <>
+            <div className="mx-auto mb-8 grid max-w-lg gap-3 text-left sm:grid-cols-3">
+              {[
+                { icon: FileText, label: 'Paste or upload a JD' },
+                { icon: Radar, label: 'Source on GitHub and Stack Overflow' },
+                { icon: BarChart3, label: 'Review ranked candidates' },
+              ].map(({ icon: Icon, label }, i) => (
+                <div key={label} className="flex items-center gap-2.5 rounded-xl border bg-background/80 px-3 py-2.5 text-xs font-medium">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                    <Icon className="h-3.5 w-3.5" />
+                  </span>
+                  <span><span className="text-muted-foreground">{i + 1}.</span> {label}</span>
+                </div>
+              ))}
+            </div>
+            <Button asChild className="shadow-lg shadow-primary/20">
+              <Link to="/searches/new">
+                <Plus className="h-4 w-4" />
+                New search
+              </Link>
+            </Button>
+          </>
+        ) : (
+          <Button asChild variant="outline">
+            <Link to="/share-requests">
+              <Share2 className="h-4 w-4" />
+              Request access
+            </Link>
+          </Button>
+        )}
       </div>
-      <h3 className="font-semibold text-xl mb-2">
-        {isRecruiter ? 'Start your first search' : 'No shared searches yet'}
-      </h3>
-      <p className="text-muted-foreground text-sm mb-6 max-w-sm">
-        {isRecruiter
-          ? 'Upload a job description and TalentLens will find and rank the best candidates from GitHub and Stack Overflow.'
-          : 'A recruiter needs to share a search with you before it appears here.'}
-      </p>
-      {isRecruiter && (
-        <Button asChild>
-          <Link to="/searches/new">
-            <Plus className="h-4 w-4" />
-            New Search
-          </Link>
-        </Button>
-      )}
     </div>
   )
 }

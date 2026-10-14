@@ -58,7 +58,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   register: async (data) => {
     const { register } = await getAuthApi()
-    await register(data)
+    // Registering signs the new account in, the same as a login.
+    const session = await register(data)
+    get().setTokens(session.accessToken, session.refreshToken)
+    set({ user: session.user, isAuthenticated: true, isHydrated: true })
   },
 
   refresh: async () => {
@@ -72,9 +75,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    const { accessToken } = get()
     localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN)
     set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false })
+    // The session cookie is HttpOnly, so only the server can clear it. Best effort:
+    // the local session is already gone either way.
+    getAuthApi()
+      .then(({ logout }) => logout(accessToken))
+      .catch(() => {})
   },
 
   hydrateFromStorage: () => {

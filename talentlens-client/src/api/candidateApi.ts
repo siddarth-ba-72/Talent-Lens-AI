@@ -4,6 +4,7 @@ import type { PageResponse } from '@/types/common'
 
 export async function getCandidates(searchId: string, filters: CandidateFilters): Promise<PageResponse<Candidate>> {
   const params = new URLSearchParams()
+  if (filters.runId) params.set('runId', filters.runId)
   if (filters.skill) params.set('skill', filters.skill)
   if (filters.source && filters.source !== 'ALL') params.set('source', filters.source)
   if (filters.minScore !== undefined) params.set('minScore', String(filters.minScore))
@@ -27,6 +28,7 @@ export async function exportCandidates(
   filters?: CandidateFilters
 ): Promise<Blob> {
   const params = new URLSearchParams({ format })
+  if (filters?.runId) params.set('runId', filters.runId)
   if (filters?.skill) params.set('skill', filters.skill)
   if (filters?.source && filters.source !== 'ALL') params.set('source', filters.source)
   if (filters?.minScore !== undefined) params.set('minScore', String(filters.minScore))

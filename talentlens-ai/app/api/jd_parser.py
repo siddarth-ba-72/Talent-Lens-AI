@@ -2,10 +2,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from app.dependencies import get_jd_parser_service
 from app.models.jd_models import GenerateQueriesRequest, GenerateQueriesResponse, ParseJdRequest, ParsedJdModel
+from app.security.auth import require_recruiter
 from app.services.jd_parser_service import JdParserService
 
 
-router = APIRouter(prefix="/ai", tags=["jd-parser"])
+# Every route here spends LLM quota, so the whole router requires a recruiter session.
+router = APIRouter(prefix="/ai", tags=["jd-parser"], dependencies=[Depends(require_recruiter)])
 
 
 @router.post("/parse-jd", response_model=ParsedJdModel)
