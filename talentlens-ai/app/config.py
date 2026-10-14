@@ -39,6 +39,8 @@ class Settings(BaseSettings):
 
     google_client_id: Optional[str] = Field(default=None, alias="GOOGLE_CLIENT_ID")
     google_client_secret: Optional[str] = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
+    # One or more redirect URIs, comma-separated (e.g. the service's own origin and the
+    # Vite dev server's). Each must also be registered in Google Cloud Console.
     google_redirect_uri: Optional[str] = Field(default=None, alias="GOOGLE_REDIRECT_URI")
     google_token_endpoint: str = Field(default="https://oauth2.googleapis.com/token", alias="GOOGLE_TOKEN_ENDPOINT")
 
@@ -94,6 +96,10 @@ class Settings(BaseSettings):
     @property
     def expose_docs(self) -> bool:
         return self.docs_enabled if self.docs_enabled is not None else self.is_dev
+
+    @property
+    def google_redirect_uris(self) -> list[str]:
+        return [uri.strip() for uri in (self.google_redirect_uri or "").split(",") if uri.strip()]
 
     @property
     def cors_origins(self) -> list[str]:

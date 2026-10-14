@@ -31,10 +31,16 @@ logger = logging.getLogger(__name__)
 
 _API = "https://huggingface.co/api"
 _MAX_FILTERS = 3
-_MODELS_PER_FILTER = 50
+# Most-liked models mostly belong to organisations (about 1 author in 4 is a
+# person), so look deep and check authors in batches until enough are found.
+_MODELS_PER_FILTER = 100
 _MAX_AUTHORS = 20
+_AUTHORS_TO_CHECK = 80
+_BATCH = 16
 _MAX_SKILLS = 20
-_CONCURRENCY = 5
+_CONCURRENCY = 8
+# The Hub answers some list queries with 504 when busy; a retry usually succeeds.
+_RETRIES = 2
 
 LIBRARY_TAGS = frozenset({
     "pytorch", "tensorflow", "jax", "keras", "transformers", "diffusers", "sentence-transformers", "peft",
@@ -90,16 +96,14 @@ class HuggingFaceSourceToolAdapter(SourceToolAdapter):
             # author -> their models found for the JD's tags
             authors: dict[str, list[dict]] = {}
             for tag in filters:
+                # The dedicated parameters; the generic `filter=` is slower and times out more often.
+                kind = "library" if tag in LIBRARY_TAGS else "pipeline_tag"
                 try:
-                    response = await client.get(
-                        f"{_API}/models",
-                        params={"filter": tag, "sort": "likes", "direction": -1, "limit": _MODELS_PER_FILTER},
-                    )
-                    response.raise_for_status()
+                    models = await _get(client, "/models", {kind: tag, "sort": "likes", "limit": _MODELS_PER_FILTER})
                 except Exception as exc:
                     logger.warning("Hugging Face models for %s failed: %s", tag, exc)
                     continue
-                for model in response.json():
+                for model in models:
                     model_id = model.get("id") or ""
                     if "/" not in model_id or _is_reupload(model):
                         continue
@@ -115,23 +119,32 @@ class HuggingFaceSourceToolAdapter(SourceToolAdapter):
                     if overview.status_code == 404:
                         return None  # an organisation, not a person
                     overview.raise_for_status()
-                    models = await client.get(f"{_API}/models", params={"author": author, "limit": 50})
-                    models.raise_for_status()
-                    return overview.json(), models.json()
+                    return overview.json(), await _get(client, "/models", {"author": author, "limit": 50})
 
-            # Look at a few more than needed: some top authors are organisations.
-            shortlist = ranked[: _MAX_AUTHORS * 2]
-            results = await asyncio.gather(*(load(author) for author, _ in shortlist), return_exceptions=True)
+            candidates: list[RawCandidate] = []
+            shortlist = ranked[:_AUTHORS_TO_CHECK]
+            for start in range(0, len(shortlist), _BATCH):
+                batch = shortlist[start:start + _BATCH]
+                results = await asyncio.gather(*(load(author) for author, _ in batch), return_exceptions=True)
+                for (author, found), result in zip(batch, results):
+                    if result is not None and not isinstance(result, BaseException):
+                        candidates.append(_to_candidate(author, found, *result))
+                if len(candidates) >= _MAX_AUTHORS:
+                    break
 
-        candidates = []
-        for (author, found), result in zip(shortlist, results):
-            if result is None or isinstance(result, BaseException):
-                continue
-            candidates.append(_to_candidate(author, found, *result))
-            if len(candidates) >= _MAX_AUTHORS:
-                break
+        candidates = candidates[:_MAX_AUTHORS]
         logger.info("Hugging Face adapter fetched %d candidates for %s", len(candidates), filters)
         return candidates
+
+
+async def _get(client: httpx.AsyncClient, path: str, params: dict) -> list[dict]:
+    for attempt in range(_RETRIES + 1):
+        response = await client.get(f"{_API}{path}", params=params)
+        if response.status_code != 504 or attempt == _RETRIES:
+            break
+        await asyncio.sleep(1 + attempt)
+    response.raise_for_status()
+    return response.json()
 
 
 def hf_filters(terms: list[str]) -> list[str]:

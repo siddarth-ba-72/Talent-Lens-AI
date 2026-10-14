@@ -80,8 +80,9 @@ async def google_callback(
     code: str,
     code_verifier: str,
     nonce: str,
+    redirect_uri: Optional[str] = None,
 ) -> GoogleCallbackResult:
-    identity = await oidc.exchange_code_and_verify(code, code_verifier, nonce)
+    identity = await oidc.exchange_code_and_verify(code, code_verifier, nonce, redirect_uri)
 
     # 1. Existing Google-linked user
     by_google_id = await session.scalar(select(User).where(User.google_id == identity.google_sub))

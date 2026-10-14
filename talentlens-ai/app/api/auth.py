@@ -119,7 +119,9 @@ async def google_callback(
     settings: Settings = Depends(get_settings),
     oidc: GoogleOidcService = Depends(get_google_oidc_service),
 ) -> GoogleCallbackResponse:
-    result = await auth_service.google_callback(session, settings, oidc, body.code, body.codeVerifier, body.nonce)
+    result = await auth_service.google_callback(
+        session, settings, oidc, body.code, body.codeVerifier, body.nonce, body.redirectUri
+    )
     if result.user is not None:
         return GoogleCallbackResponse(needsRoleSelection=False, auth=_start_session(response, settings, result.user))
 
