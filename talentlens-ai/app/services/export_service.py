@@ -12,7 +12,7 @@ from app.services.candidate_service import to_response
 
 CSV_HEADER = (
     "id,name,email,source,sourceUsername,profileUrl,skills,location,"
-    "matchScore,skillMatch,experienceMatch,overallFit,runId,sourcedAt"
+    "matchScore,skillMatch,experienceMatch,overallFit,runId,sourcedAt,openToWork,signals"
 )
 _MEDIA_TYPES = {"csv": "text/csv", "json": "application/json"}
 # Spreadsheet apps evaluate cells starting with these as formulas. Candidate
@@ -65,6 +65,8 @@ def _csv_row(candidate: CandidateDocument) -> str:
             str(breakdown.overallFit),
             _quote(candidate.runId),
             candidate.sourcedAt.isoformat().replace("+00:00", "Z"),
+            "true" if candidate.openToWork else "false",
+            _quote("|".join(candidate.signals)),
         ]
     )
 

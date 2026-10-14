@@ -3,27 +3,29 @@ from __future__ import annotations
 import re
 from typing import Optional
 
+from app.services.skill_vocabulary import canonical, matchable_terms
+
 
 YEARS_PATTERN = re.compile(r"(\d{1,2})\+?\s*(?:years?|yrs?)", re.IGNORECASE)
 
 
 def compute_skill_match(jd_skills: list[str], candidate_skills: list[str]) -> int:
-    jd_set = {_normalize_token(item) for item in jd_skills if item}
-    candidate_set = {_normalize_token(item) for item in candidate_skills if item}
+    """Share of the JD's matchable terms (see skill_vocabulary) found among the candidate's skills.
 
-    jd_set.discard("")
-    candidate_set.discard("")
-
-    if not jd_set:
+    Pass the JD's technologies before its skills: only the first MAX_JD_TERMS count.
+    """
+    jd_terms = matchable_terms(jd_skills)
+    if not jd_terms:
         return 0
 
-    overlap = len(jd_set.intersection(candidate_set))
-    return max(0, min(100, round((overlap / len(jd_set)) * 100)))
+    candidate_set = {canonical(item) for item in candidate_skills if item}
+    overlap = sum(1 for term in jd_terms if term in candidate_set)
+    return max(0, min(100, round((overlap / len(jd_terms)) * 100)))
 
 
 def compute_experience_match(jd_experience: Optional[str], candidate_experience: Optional[str]) -> int:
-    jd_level = _infer_level(jd_experience)
-    candidate_level = _infer_level(candidate_experience)
+    jd_level = infer_level(jd_experience)
+    candidate_level = infer_level(candidate_experience)
 
     if jd_level == 0 or candidate_level == 0:
         return 50
@@ -43,11 +45,7 @@ def compute_match_score(skill_match: int, experience_match: int) -> int:
     return max(0, min(100, weighted))
 
 
-def _normalize_token(value: str) -> str:
-    return " ".join(value.strip().lower().split())
-
-
-def _infer_level(value: Optional[str]) -> int:
+def infer_level(value: Optional[str]) -> int:
     if not value:
         return 0
 

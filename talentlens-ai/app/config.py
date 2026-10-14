@@ -48,6 +48,14 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     github_token: Optional[str] = Field(default=None, alias="GITHUB_TOKEN")
+    # Sourcing credentials. A platform whose required setting is missing is
+    # offered as unavailable (see app/services/sources/registry.py).
+    stackexchange_key: Optional[str] = Field(default=None, alias="STACKEXCHANGE_KEY")
+    gitlab_token: Optional[str] = Field(default=None, alias="GITLAB_TOKEN")
+    hf_token: Optional[str] = Field(default=None, alias="HF_TOKEN")
+    openalex_api_key: Optional[str] = Field(default=None, alias="OPENALEX_API_KEY")
+    # Contact sent in the User-Agent where an API's usage policy asks for one (crates.io).
+    sourcing_contact: Optional[str] = Field(default=None, alias="SOURCING_CONTACT")
     llm_timeout_seconds: int = Field(default=30, alias="LLM_TIMEOUT_SECONDS")
     llm_max_retries: int = Field(default=2, alias="LLM_MAX_RETRIES")
     llm_log_prompts: bool = Field(default=False, alias="LLM_LOG_PROMPTS")

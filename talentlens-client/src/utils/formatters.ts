@@ -1,5 +1,6 @@
 import type { SearchStatus, SourcingTaskStatus, Platform } from '@/types/search'
 import type { CandidateSource } from '@/types/candidate'
+import { getPlatformMeta } from '@/utils/platforms'
 
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', {
@@ -70,11 +71,7 @@ export function getSourcingStatusLabel(status: SourcingTaskStatus): string {
 }
 
 export function getPlatformLabel(platform: Platform | CandidateSource): string {
-  const labels: Record<string, string> = {
-    GITHUB: 'GitHub',
-    STACKOVERFLOW: 'Stack Overflow',
-  }
-  return labels[platform] ?? platform
+  return getPlatformMeta(platform).label
 }
 
 export function getInitials(name: string | null | undefined): string {

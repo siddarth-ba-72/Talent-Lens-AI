@@ -1,6 +1,15 @@
 export type SearchStatus = 'PENDING' | 'SOURCING' | 'COMPLETED' | 'FAILED'
 export type SourcingTaskStatus = 'IDLE' | 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED'
-export type Platform = 'GITHUB' | 'STACKOVERFLOW'
+export type Platform =
+  | 'GITHUB'
+  | 'STACKOVERFLOW'
+  | 'HACKERNEWS'
+  | 'DEVTO'
+  | 'HUGGINGFACE'
+  | 'NPM'
+  | 'CRATES'
+  | 'GITLAB'
+  | 'OPENALEX'
 
 export interface ParsedJd {
   skills: string[]
@@ -30,8 +39,13 @@ export interface CreateSearchRequest {
   jdFile?: File
 }
 
-export interface SourcingRequest {
-  platforms: Platform[]
+// Either the platforms to search, or `auto` to let the server pick the ones that suit the JD.
+export type SourcingRequest = { platforms: Platform[]; auto?: false } | { auto: true; platforms?: never }
+
+export interface PlatformAvailability {
+  platform: Platform
+  // False when the server lacks a credential the platform needs.
+  available: boolean
 }
 
 // One sourcing run of a search (the API calls it a task). Each run keeps its own candidates.

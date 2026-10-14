@@ -1,0 +1,9 @@
+{
+  "skills": ["Distributed systems", "Go", "Event-driven architecture", "Strong written communication"],
+  "responsibilities": ["Design and run high-throughput event pipelines", "Own services end to end in production"],
+  "experienceLevel": "Senior (5+ years)",
+  "qualifications": ["5+ years building backend services"],
+  "technologies": ["Go", "Kafka", "PostgreSQL", "Kubernetes", "gRPC"],
+  "domain": "Fintech",
+  "summary": "Senior backend engineer for a payments platform built on Go and Kafka."
+}

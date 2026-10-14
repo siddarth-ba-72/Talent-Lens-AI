@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, Trash2, MapPin, Mail, GitBranch, Hash, GraduationCap } from 'lucide-react'
+import { ExternalLink, Trash2, MapPin, Mail, GraduationCap, BadgeCheck, Lightbulb } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { SkillTags } from './SkillTags'
 import { deleteCandidate } from '@/api/candidateApi'
 import { useUiStore } from '@/stores/uiStore'
 import { getInitials } from '@/utils/formatters'
+import { getPlatformMeta } from '@/utils/platforms'
 import { QUERY_KEYS } from '@/utils/constants'
 import type { Candidate } from '@/types/candidate'
 import { useState } from 'react'
@@ -23,6 +24,8 @@ export function CandidateCard({ candidate, canDelete = false }: CandidateCardPro
   const queryClient = useQueryClient()
   const { addToast } = useUiStore()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const source = getPlatformMeta(candidate.source)
+  const SourceIcon = source.icon
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteCandidate(candidate.searchId, candidate.id),
@@ -68,16 +71,16 @@ export function CandidateCard({ candidate, canDelete = false }: CandidateCardPro
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-base">{candidate.name}</h3>
-                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      candidate.source === 'GITHUB'
-                        ? 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
-                        : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                    }`}>
-                      {candidate.source === 'GITHUB'
-                        ? <GitBranch className="h-3 w-3" />
-                        : <Hash className="h-3 w-3" />}
-                      {candidate.source === 'GITHUB' ? 'GitHub' : 'Stack Overflow'}
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${source.badgeClass}`}>
+                      <SourceIcon className="h-3 w-3" />
+                      {source.label}
                     </span>
+                    {candidate.openToWork && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        <BadgeCheck className="h-3 w-3" />
+                        Open to work
+                      </span>
+                    )}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                     {candidate.location && (
@@ -111,6 +114,18 @@ export function CandidateCard({ candidate, canDelete = false }: CandidateCardPro
                   )}
                 </div>
               </div>
+
+              {/* Why they were picked */}
+              {candidate.signals && candidate.signals.length > 0 && (
+                <ul className="mt-2 space-y-0.5">
+                  {candidate.signals.slice(0, 3).map((signal) => (
+                    <li key={signal} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <Lightbulb className="mt-0.5 h-3 w-3 shrink-0" />
+                      <span className="break-words">{signal}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
               {/* Skills */}
               {candidate.skills?.length > 0 && (

@@ -11,7 +11,7 @@ export const ALLOWED_MIME_TYPES = [
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
 export const MIN_JD_LENGTH = 100
-export const DEFAULT_PLATFORMS: Platform[] = ['GITHUB', 'STACKOVERFLOW']
+export const DEFAULT_PLATFORMS: Platform[] = ['GITHUB', 'STACKOVERFLOW', 'HACKERNEWS']
 export const TOAST_DURATION_MS = 4000
 
 export const STORAGE_KEYS = {
@@ -38,6 +38,7 @@ export const QUERY_KEYS = {
   CANDIDATES: 'candidates',
   SOURCING_STATUS: 'sourcingStatus',
   SOURCING_RUNS: 'sourcingRuns',
+  PLATFORMS: 'platforms',
   SHARE_REQUESTS: 'shareRequests',
   RECRUITERS: 'recruiters',
   ME: 'me',

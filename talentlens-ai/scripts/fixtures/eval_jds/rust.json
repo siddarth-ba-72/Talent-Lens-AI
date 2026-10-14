@@ -1,0 +1,9 @@
+{
+  "skills": ["Systems programming", "Async I/O", "Performance tuning"],
+  "responsibilities": ["Build low-latency networked services"],
+  "experienceLevel": "Mid-level",
+  "qualifications": ["Production Rust experience"],
+  "technologies": ["Rust", "Tokio", "gRPC", "Linux"],
+  "domain": "Infrastructure",
+  "summary": "Rust engineer for low-latency network services."
+}

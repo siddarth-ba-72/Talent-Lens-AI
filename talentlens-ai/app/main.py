@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from app.api.auth import router as auth_router
 from app.api.candidates import router as candidates_router
 from app.api.jd_parser import router as jd_parser_router
+from app.api.platforms import router as platforms_router
 from app.api.searches import router as searches_router
 from app.api.share_requests import router as share_requests_router
 from app.api.sourcing import router as sourcing_router
@@ -98,6 +99,7 @@ app.include_router(candidates_router)
 app.include_router(share_requests_router)
 app.include_router(jd_parser_router)
 app.include_router(sourcing_router)
+app.include_router(platforms_router)
 
 # Last: the UI catch-all must not shadow any API route.
 mount_ui(app, settings.static_dir)

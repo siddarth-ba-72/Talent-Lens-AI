@@ -27,6 +27,10 @@ dev = [
     "pytest>=9.1.1",
 ]
 
+[tool.pytest.ini_options]
+# Lets `uv run pytest` import the `app` package from this directory.
+pythonpath = ["."]
+
 # Vercel (see vercel.json for the build command and function limits).
 [tool.vercel]
 entrypoint = "app.main:app"

@@ -115,7 +115,7 @@ def test_csv_export_layout():
     assert header == export_service.CSV_HEADER
     assert row == (
         '"65f000000000000000000001","Ada Lovelace",,"GITHUB","ada","https://github.com/ada",'
-        '"Python|C","London, ""UK""",88,90,85,88,"run_1",2026-01-02T03:04:05Z'
+        '"Python|C","London, ""UK""",88,90,85,88,"run_1",2026-01-02T03:04:05Z,false,""'
     )
 
 

@@ -12,6 +12,14 @@ from app.models.jd_models import ParsedJdModel
 class SourcePlatform(str, Enum):
     GITHUB = "GITHUB"
     STACKOVERFLOW = "STACKOVERFLOW"
+    HACKERNEWS = "HACKERNEWS"
+    DEVTO = "DEVTO"
+    HUGGINGFACE = "HUGGINGFACE"
+    NPM = "NPM"
+    CRATES = "CRATES"
+    GITLAB = "GITLAB"
+    OPENALEX = "OPENALEX"
+    # No longer offered (they never sourced anyone); kept so stored data still loads.
     LEETCODE = "LEETCODE"
     PEOPLES_DATA = "PEOPLES_DATA"
     OTHER = "OTHER"
@@ -34,6 +42,10 @@ class RankedCandidateModel(BaseModel):
     bio: Optional[str] = None
     location: Optional[str] = None
     experience: Optional[str] = None
+    # Short reasons the candidate was picked, e.g. "Top answerer in [go]".
+    signals: list[str] = Field(default_factory=list)
+    # The candidate says they are looking (GitHub "hireable", an HN "Who wants to be hired?" post).
+    openToWork: bool = False
     matchScore: int = Field(ge=0, le=100)
     scoreBreakdown: ScoreBreakdownModel
     sourcedAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -52,6 +64,8 @@ class CandidateResponse(BaseModel):
     skills: list[str]
     bio: Optional[str]
     location: Optional[str]
+    signals: list[str]
+    openToWork: bool
     matchScore: int
     scoreBreakdown: ScoreBreakdownModel
     sourcedAt: datetime
